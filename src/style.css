@@ -1292,20 +1292,20 @@ tbody tr:hover {
   color: #77877d;
   line-height: 1.8;
 }
-.loaded-latency {
+.website-latency {
   margin: 12px 0;
 }
-.loaded-latency div {
+.website-latency div {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 6px;
   margin: 4px 0;
 }
-.loaded-latency dt {
+.website-latency dt {
   color: #77877d;
 }
-.loaded-latency dd {
+.website-latency dd {
   margin: 0;
   font-variant-numeric: tabular-nums;
 }

@@ -36,6 +36,7 @@ function harness(options = {}) {
       probeSignal = signal
       return 'TEST'
     },
+    measureSites: async () => {},
     ...options,
   })
   return {
@@ -95,6 +96,7 @@ test('stopping while connecting prevents the engine from starting later', async 
       }),
   })
   const pending = h.session.start()
+  await Promise.resolve()
   h.session.stop()
   resolveProbe('TEST')
   await pending
@@ -152,4 +154,41 @@ test('node probe reads only the node label and propagates abort to fetch', async
     return new Response('', { headers: { 'cf-meta-colo': 'TEST' } })
   })
   assert.equal(await probeSpeedNode(controller.signal), 'TEST')
+})
+
+test('website measurements finish before bandwidth and survive a node failure', async () => {
+  let finishSites
+  const h = harness({ measureSites: (_signal, onResult) => new Promise((resolve) => {
+    onResult({ id: 'baidu', name: '百度', status: 'complete', latency: 50, samples: 3 })
+    finishSites = resolve
+  }) })
+  const pending = h.session.start()
+  assert.equal(h.engines.length, 0)
+  assert.equal(h.state.phase, 'websites')
+  finishSites()
+  await pending
+  assert.equal(h.engines.length, 1)
+  h.engines[0].onError('unreachable')
+  assert.equal(h.state.websites.find((site) => site.id === 'baidu').latency, 50)
+})
+
+test('stopping website measurement cancels it and rejects late callbacks', async () => {
+  let finishSites
+  let callback
+  let signal
+  const h = harness({ measureSites: (currentSignal, onResult) => new Promise((resolve) => {
+    signal = currentSignal
+    callback = onResult
+    onResult({ id: 'baidu', name: '百度', status: 'running', latency: null, samples: 0 })
+    finishSites = resolve
+  }) })
+  const pending = h.session.start()
+  h.session.stop()
+  assert.equal(signal.aborted, true)
+  assert.equal(h.state.websites.find((site) => site.id === 'baidu').status, 'stopped')
+  callback({ id: 'baidu', status: 'complete', latency: 1 })
+  finishSites()
+  await pending
+  assert.equal(h.engines.length, 0)
+  assert.equal(h.state.websites.find((site) => site.id === 'baidu').latency, null)
 })

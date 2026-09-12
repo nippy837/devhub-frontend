@@ -1,3 +1,5 @@
+import { emptyWebsiteResults } from '../services/websiteLatency.js'
+
 export const SPEED_TEST_URL = 'https://speed.cloudflare.com'
 export const MIN_STABILITY_SAMPLES = 10
 export const SPEED_TEST_TIMEOUT_MS = 90_000
@@ -10,8 +12,8 @@ export function createSpeedTestConfig() {
     logMeasurementApiUrl: null,
     logAimApiUrl: null,
     includeCredentials: false,
-    measureDownloadLoadedLatency: true,
-    measureUploadLoadedLatency: true,
+    measureDownloadLoadedLatency: false,
+    measureUploadLoadedLatency: false,
     loadedLatencyThrottle: 500,
     bandwidthAbortRequestDuration: 15_000,
     bandwidthFinishRequestDuration: 1000,
@@ -103,7 +105,8 @@ export function readSpeedResults(results) {
 export function emptySpeedState() {
   return {
     status: 'idle',
-    phase: 'connection',
+    phase: 'websites',
+    websites: emptyWebsiteResults(),
     node: '',
     error: '',
     elapsed: 0,

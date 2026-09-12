@@ -25,6 +25,7 @@ function begin() {
   start()
 }
 const phaseNames = {
+  websites: '测量常用网站访问耗时',
   connection: '连接测速节点',
   latency: '测量延迟',
   download: '测量下载速度',
@@ -71,7 +72,7 @@ const stabilityText = computed(() => {
     <section class="page-heading">
       <div>
         <h1>网速测试</h1>
-        <p class="page-description">看看下载有多快，上传顺不顺。</p>
+        <p class="page-description">预计 30～60 秒，超过 90 秒自动结束。</p>
       </div>
       <button v-if="running" class="button button-outline" @click="stop">
         停止测速
@@ -131,18 +132,17 @@ const stabilityText = computed(() => {
         <p>延迟忽高忽低的程度。越小，通话和游戏越稳。</p>
       </article>
       <article class="speed-metric">
-        <h2>忙时延迟</h2>
-        <dl class="loaded-latency">
-          <div>
-            <dt>下载时</dt>
-            <dd>{{ ms(state.downLoadedLatency) }}</dd>
-          </div>
-          <div>
-            <dt>上传时</dt>
-            <dd>{{ ms(state.upLoadedLatency) }}</dd>
+        <h2>常用网站访问</h2>
+        <dl class="website-latency">
+          <div v-for="site in state.websites" :key="site.id">
+            <dt>{{ site.name }}</dt>
+            <dd :title="site.samples ? `${site.samples} 次有效测量的中位数` : undefined">
+              {{ site.status === 'complete' ? ms(site.latency)
+                : { idle: '待测', running: '测量中', stopped: '已停止', unavailable: '未测得' }[site.status] }}
+            </dd>
           </div>
         </dl>
-        <p>传文件时反应会不会变慢，可以和左边的延迟比一比。</p>
+        <p>网站图标加载耗时，不代表 App 打开速度。</p>
       </article>
       <article
         class="speed-metric stability-card"
@@ -212,7 +212,11 @@ const stabilityText = computed(() => {
           后端。结果受节点距离、Wi-Fi、代理和其他下载任务影响；海外节点可能受跨境线路影响，不代表所有网站的速度。
         </li>
         <li>
-          使用短时分段测速，高速宽带的结果可能偏低。忙时延迟没有足够样本时显示“未测得”。
+          使用短时分段测速，高速宽带的结果可能偏低。
+        </li>
+        <li>
+          常用网站先于下载、上传测速：每站加载 3 次图标，取成功请求的中位数，单次最多等 4 秒。
+          耗时包含连接与资源加载，资源可能来自 CDN；加载失败显示“未测得”，不代表网站或网络不可用。
         </li>
         <li>本版暂不测丢包率。请求失败不能直接当成丢包。</li>
       </ul>

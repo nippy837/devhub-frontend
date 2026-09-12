@@ -1,3 +1,4 @@
+import { measureWebsiteLatency } from './websiteLatency.js'
 import {
   createSpeedTestConfig,
   emptySpeedState,
@@ -27,6 +28,7 @@ export function createSpeedTestSession({
   loadEngine = () =>
     import('@cloudflare/speedtest').then((module) => module.default),
   probe = probeSpeedNode,
+  measureSites = measureWebsiteLatency,
   now = () => performance.now(),
   timeoutMs = SPEED_TEST_TIMEOUT_MS,
 }) {
@@ -47,6 +49,12 @@ export function createSpeedTestSession({
     clearInterval(clock)
     controller?.abort()
     controller = null
+    state = {
+      ...state,
+      websites: state.websites.map((site) =>
+        site.status === 'running' ? { ...site, status: 'stopped' } : site,
+      ),
+    }
     if (engine) {
       engine.onPhaseChange =
         engine.onResultsChange =
@@ -75,6 +83,16 @@ export function createSpeedTestSession({
       if (generation === current) publish({ elapsed: now() - startedAt })
     }, 500)
     try {
+      await measureSites(controller.signal, (result) => {
+        if (generation === current)
+          publish({
+            websites: state.websites.map((site) =>
+              site.id === result.id ? result : site,
+            ),
+          })
+      })
+      if (generation !== current) return
+      publish({ phase: 'connection' })
       const [Engine, node] = await Promise.all([
         loadEngine(),
         probe(controller.signal),
