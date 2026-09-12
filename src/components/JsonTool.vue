@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useToolTask } from '../composables/useToolTask'
+import { copyText } from '../utils/clipboard.js'
 import FileImport from './FileImport.vue'
 
 const input = ref('')
@@ -25,7 +26,7 @@ function process(compact = false) {
 }
 async function copy() {
   try {
-    await navigator.clipboard.writeText(input.value)
+    await copyText(input.value)
     message.value = '已复制'
   } catch {
     message.value = '复制失败，请手动选择内容复制'
