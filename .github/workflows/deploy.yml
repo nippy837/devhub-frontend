@@ -1,0 +1,47 @@
+name: Deploy Frontend
+
+# 在 GitHub 页面点击按钮时运行
+on:
+  workflow_dispatch:
+
+# 本次连接检查不需要访问仓库内容
+permissions: {}
+
+jobs:
+  check-connection:
+    # GitHub 提供一台临时 Ubuntu 机器执行这些步骤
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    # 读取你刚才保存的四个 Secrets
+    env:
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+
+    steps:
+      - name: 配置 SSH 登录凭据
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          # 写入私钥和可信服务器记录，不打印内容
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+
+      - name: 验证服务器连接和部署环境
+        run: |
+          # 禁止交互式密码登录，并严格验证服务器身份
+          ssh \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$SSH_USER@$SSH_HOST" '
+              set -eu
+              echo "GitHub Actions 已连接服务器"
+              cd /home/ubuntu/projects/devhub
+              docker compose version
+              docker compose config --quiet
+            '
