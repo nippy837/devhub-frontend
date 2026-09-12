@@ -20,7 +20,9 @@ export async function probeSpeedNode(signal) {
   )
   if (!response.ok) throw new Error('测速节点暂时不可用，请稍后重试。')
   await response.arrayBuffer()
-  return response.headers.get('cf-meta-colo') || ''
+  if (response.headers.get('X-DevHub-Speed') !== '1')
+    throw new Error('测速节点暂时不可用，请稍后重试。')
+  return decodeURIComponent(response.headers.get('X-DevHub-Node') || '')
 }
 
 export function createSpeedTestSession({

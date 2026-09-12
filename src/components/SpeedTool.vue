@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import SpeedGauge from './SpeedGauge.vue'
+import { websiteQuality } from '../utils/websiteQuality.js'
 import { useSpeedTest } from '../composables/useSpeedTest'
 import {
   formatMeasurement,
@@ -8,7 +9,9 @@ import {
   getStability,
 } from '../utils/speedMetrics'
 
+const defaultNodeName = import.meta.env.DEV ? '本地开发节点' : '北京 · DevHub'
 const { state, start, stop } = useSpeedTest()
+const websites = computed(() => state.value.websites.map((site) => ({ ...site, quality: websiteQuality(site) })))
 const running = computed(() => state.value.status === 'running')
 const maximum = ref(100)
 watch(
@@ -90,9 +93,7 @@ const stabilityText = computed(() => {
         >
       </div>
       <span class="muted"
-        >测速节点：Cloudflare{{
-          state.node ? ` · ${state.node}` : '（自动选择）'
-        }}</span
+        >测速节点：{{ state.node || defaultNodeName }}</span
       >
     </section>
     <p v-if="state.error" class="speed-error" role="alert">{{ state.error }}</p>
@@ -114,6 +115,35 @@ const stabilityText = computed(() => {
         tone="upload"
       />
     </div>
+    <section class="website-panel" aria-labelledby="website-heading">
+      <div class="website-panel-heading">
+        <h2 id="website-heading">常用网站访问</h2>
+        <span class="muted">网站资源加载耗时</span>
+      </div>
+      <div class="website-cards">
+        <article v-for="site in websites" :key="site.id" class="website-card" :class="`website-${site.quality.tone}`">
+          <div class="website-card-heading">
+            <h3>{{ site.name }}</h3>
+            <span class="website-badge"><i aria-hidden="true"></i>{{ site.quality.label }}</span>
+          </div>
+          <div class="website-reading">
+            <strong>{{ site.quality.position === null ? '—' : formatMeasurement(site.latency) }}</strong>
+            <span>ms</span>
+          </div>
+          <div class="website-scale" aria-hidden="true">
+            <span v-if="site.quality.position !== null" class="website-marker" :style="{ left: `${site.quality.position}%` }"></span>
+          </div>
+          <div class="website-scale-labels" aria-hidden="true"><span>0</span><span>1,000+ ms</span></div>
+          <p>{{ site.samples ? `${site.samples} 次有效测量 · 中位数` : '等待有效测量' }}</p>
+        </article>
+      </div>
+      <div class="website-legend">
+        <span><i class="guide-dot green"></i>低：≤200 ms</span>
+        <span><i class="guide-dot yellow"></i>中：200～500 ms</span>
+        <span><i class="guide-dot red"></i>高：>500 ms</span>
+      </div>
+      <p class="muted">本站参考分档，不代表 App 打开速度。</p>
+    </section>
     <section class="speed-metrics" aria-label="网络质量">
       <article class="speed-metric">
         <h2>延迟</h2>
@@ -130,19 +160,6 @@ const stabilityText = computed(() => {
           ><span>ms</span>
         </div>
         <p>延迟忽高忽低的程度。越小，通话和游戏越稳。</p>
-      </article>
-      <article class="speed-metric">
-        <h2>常用网站访问</h2>
-        <dl class="website-latency">
-          <div v-for="site in state.websites" :key="site.id">
-            <dt>{{ site.name }}</dt>
-            <dd :title="site.samples ? `${site.samples} 次有效测量的中位数` : undefined">
-              {{ site.status === 'complete' ? ms(site.latency)
-                : { idle: '待测', running: '测量中', stopped: '已停止', unavailable: '未测得' }[site.status] }}
-            </dd>
-          </div>
-        </dl>
-        <p>网站图标加载耗时，不代表 App 打开速度。</p>
       </article>
       <article
         class="speed-metric stability-card"
@@ -208,8 +225,8 @@ const stabilityText = computed(() => {
           MB，重试可能增加流量；可以随时停止，离开页面或切到后台也会停止。
         </li>
         <li>
-          测速流量直接连接 Cloudflare，不经过 DevHub
-          后端。结果受节点距离、Wi-Fi、代理和其他下载任务影响；海外节点可能受跨境线路影响，不代表所有网站的速度。
+          测速流量直接连接北京的 DevHub 服务器，由独立测速接口收发，不经过 Java 业务接口。
+          结果受服务器带宽上限、Wi-Fi、代理和其他下载任务影响，不代表宽带套餐的最高速度。
         </li>
         <li>
           使用短时分段测速，高速宽带的结果可能偏低。

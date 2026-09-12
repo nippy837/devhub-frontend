@@ -144,14 +144,14 @@ test('a failed probe is surfaced without starting measurements', async () => {
 test('node probe reads only the node label and propagates abort to fetch', async (context) => {
   const controller = new AbortController()
   context.mock.method(globalThis, 'fetch', async (url, options) => {
-    assert.equal(new URL(url).hostname, 'speed.cloudflare.com')
-    assert.equal(new URL(url).searchParams.get('bytes'), '0')
-    assert.equal(new URL(url).pathname, '/__up')
+    assert.equal(new URL(url, 'http://localhost').pathname, '/speed/__up')
+    assert.equal(new URL(url, 'http://localhost').searchParams.get('bytes'), '0')
+    assert.equal(new URL(url, 'http://localhost').pathname, '/speed/__up')
     assert.equal(options.method, 'POST')
     assert.equal(options.body, '')
     assert.equal(options.signal, controller.signal)
     assert.equal(options.credentials, 'omit')
-    return new Response('', { headers: { 'cf-meta-colo': 'TEST' } })
+    return new Response('', { headers: { 'X-DevHub-Speed': '1', 'X-DevHub-Node': 'TEST' } })
   })
   assert.equal(await probeSpeedNode(controller.signal), 'TEST')
 })

@@ -1,6 +1,6 @@
 import { emptyWebsiteResults } from '../services/websiteLatency.js'
 
-export const SPEED_TEST_URL = 'https://speed.cloudflare.com'
+export const SPEED_TEST_URL = '/speed'
 export const MIN_STABILITY_SAMPLES = 10
 export const SPEED_TEST_TIMEOUT_MS = 90_000
 
@@ -87,7 +87,7 @@ export function readSpeedResults(results) {
   const summary = results.getSummary()
   const bpsToMbps = (value) => {
     const valid = finiteMeasurement(value)
-    return valid === null ? null : valid / 1_000_000
+    return valid === null || valid === 0 ? null : valid / 1_000_000
   }
   return {
     download: bpsToMbps(summary.download),

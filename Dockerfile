@@ -12,10 +12,13 @@ RUN npm ci
 
 # 将前端代码复制到容器，并构建出 dist 文件夹
 COPY . .
-RUN npm run build
+RUN npm test && npm run build
 
 # 第二阶段：使用 Nginx 提供网页访问
 FROM nginx:stable-alpine
+RUN apk add --no-cache nodejs
+COPY server/ /opt/devhub-speed/
+CMD ["node", "/opt/devhub-speed/start.mjs"]
 
 # 用我们的配置替换 Nginx 默认的网站配置
 COPY nginx.conf /etc/nginx/conf.d/default.conf

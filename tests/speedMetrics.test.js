@@ -74,3 +74,13 @@ test('speed test is opt-in, bounded, and does not run packet loss or result logg
   )
   assert.ok(config.bandwidthAbortRequestDuration > 0)
 })
+
+test('empty bandwidth aggregates are unknown rather than a measured zero speed', () => {
+  const values = readSpeedResults({
+    getSummary: () => ({ download: 0, upload: 0, latency: 0 }),
+    getUnloadedLatencyPoints: () => [0],
+  })
+  assert.equal(values.download, null)
+  assert.equal(values.upload, null)
+  assert.equal(values.latency, 0)
+})

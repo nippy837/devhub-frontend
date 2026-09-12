@@ -43,12 +43,26 @@ jobs:
           docker rm frontend-export
 
           # 部署包只包含网页、Nginx 配置和运行用的 Dockerfile
+          cp -R server deploy-package/server
           cp nginx.conf deploy-package/nginx.conf
           cp deploy/Dockerfile deploy-package/Dockerfile
           tar -czf "$DEPLOY_ARCHIVE" -C deploy-package .
 
           # 打印部署包大小，方便了解实际上传量
           ls -lh "$DEPLOY_ARCHIVE"
+
+      - name: 检查网页与测速运行镜像
+        run: |
+          set -euo pipefail
+          docker build -t devhub-frontend-smoke deploy-package
+          docker network create devhub-smoke
+          trap 'docker rm -f devhub-speed-smoke devhub-backend-stub >/dev/null 2>&1 || true; docker network rm devhub-smoke >/dev/null 2>&1 || true' EXIT
+          docker run -d --name devhub-backend-stub --network devhub-smoke --network-alias backend nginx:stable-alpine
+          docker run -d --name devhub-speed-smoke --network devhub-smoke -p 127.0.0.1:18080:80 devhub-frontend-smoke
+          curl --fail --retry 10 --retry-delay 1 --retry-all-errors --max-time 5 http://127.0.0.1:18080/ -o /dev/null
+          curl --fail --max-time 5 'http://127.0.0.1:18080/speed/__down?bytes=1024' -o /tmp/devhub-probe.bin
+          test "$(wc -c < /tmp/devhub-probe.bin)" -eq 1024
+          curl --fail --max-time 5 -X POST --data-binary @/tmp/devhub-probe.bin 'http://127.0.0.1:18080/speed/__up?bytes=1024' -o /dev/null
 
       - name: 配置 SSH 登录凭据
         env:
