@@ -1,7 +1,6 @@
 name: Deploy Frontend
 
 on:
-  # 推送到 main 后自动部署，也保留手动运行按钮
   push:
     branches: [main]
   workflow_dispatch:
@@ -9,7 +8,6 @@ on:
 permissions:
   contents: read
 
-# 同一时间执行一次前端部署，避免互相覆盖
 concurrency:
   group: deploy-frontend
   cancel-in-progress: false
@@ -23,8 +21,7 @@ jobs:
     env:
       SSH_HOST: ${{ secrets.SSH_HOST }}
       SSH_USER: ${{ secrets.SSH_USER }}
-      # 每次运行使用不同的文件名
-      IMAGE_ARCHIVE: frontend-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz
+      DEPLOY_ARCHIVE: frontend-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz
 
     steps:
       - name: 获取本次提交的代码
@@ -32,15 +29,26 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: 构建并打包前端镜像
+      - name: 构建网页并打包
         run: |
           set -euo pipefail
 
-          # 使用提交编号标记镜像，方便区分版本
-          docker build -t "devhub-frontend:$GITHUB_SHA" .
+          # 执行原 Dockerfile 的 build 阶段，生成 dist
+          docker build --target build -t devhub-frontend-builder .
 
-          # 将镜像导出为压缩文件，稍后上传服务器
-          docker save "devhub-frontend:$GITHUB_SHA" | gzip > "$IMAGE_ARCHIVE"
+          # 创建一个不启动的临时容器，从中取出网页文件
+          docker create --name frontend-export devhub-frontend-builder
+          mkdir -p deploy-package
+          docker cp frontend-export:/app/dist deploy-package/dist
+          docker rm frontend-export
+
+          # 部署包只包含网页、Nginx 配置和运行用的 Dockerfile
+          cp nginx.conf deploy-package/nginx.conf
+          cp deploy/Dockerfile deploy-package/Dockerfile
+          tar -czf "$DEPLOY_ARCHIVE" -C deploy-package .
+
+          # 打印部署包大小，方便了解实际上传量
+          ls -lh "$DEPLOY_ARCHIVE"
 
       - name: 配置 SSH 登录凭据
         env:
@@ -53,48 +61,54 @@ jobs:
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
 
-      - name: 上传镜像到服务器
+      - name: 上传网页部署包
         run: |
-          scp \
-            -o BatchMode=yes \
-            -o StrictHostKeyChecking=yes \
-            "$IMAGE_ARCHIVE" \
-            "$SSH_USER@$SSH_HOST:/home/ubuntu/projects/devhub/$IMAGE_ARCHIVE"
+          # 显示传输字节数、百分比和速度
+          rsync --partial --info=progress2 \
+            -e "ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=3" \
+            "$DEPLOY_ARCHIVE" \
+            "$SSH_USER@$SSH_HOST:/home/ubuntu/projects/devhub/"
 
       - name: 更新前端并检查页面
         run: |
           ssh \
             -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=20 \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=3 \
             "$SSH_USER@$SSH_HOST" \
-            bash -s -- "$GITHUB_SHA" "$IMAGE_ARCHIVE" <<'REMOTE'
+            bash -s -- "$GITHUB_SHA" "$DEPLOY_ARCHIVE" <<'REMOTE'
           set -euo pipefail
           cd /home/ubuntu/projects/devhub
 
-          # 接收上面传入的提交编号和压缩文件名
           version="$1"
           archive="$2"
 
-          # 后续后端部署也使用这把锁，避免同时修改运行中的服务
+          # 与后端共用部署锁，避免同时更新容器
           exec 9>.deploy.lock
           flock -w 300 9
 
-          # 导入镜像，成功后删除上传的压缩文件
-          docker load -i "$archive"
+          # 将本次部署文件解压到独立目录
+          release="releases/${archive%.tar.gz}"
+          mkdir -p "$release"
+          tar -xzf "$archive" -C "$release"
+
+          # 用现成的网页文件构建镜像，复用服务器上的 Nginx 层
+          docker build -t "devhub-frontend:$version" "$release"
           rm -f "$archive"
 
-          # 保留上一个版本的镜像，便于需要时恢复
+          # 保留上一个版本，供需要时恢复
           if docker image inspect devhub-frontend:latest >/dev/null 2>&1; then
             docker tag devhub-frontend:latest devhub-frontend:previous
           fi
 
-          # 将新版本设为 Compose 使用的镜像
           docker tag "devhub-frontend:$version" devhub-frontend:latest
 
-          # 更新前端；使用已构建的镜像，不重新构建或重启后端
+          # 更新前端，不重新构建或重启后端
           docker compose up -d --no-deps --no-build frontend
 
-          # 等待网页能够正常响应，失败时让工作流显示红色
+          # 检查网页是否能正常响应
           curl --fail --silent --show-error \
             --retry 12 --retry-delay 5 --retry-all-errors \
             --max-time 10 \
