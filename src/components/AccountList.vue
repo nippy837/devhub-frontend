@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { getAccounts } from '../api/accounts'
 import AppIcon from './AppIcon.vue'
+import AccountCreateDialog from './AccountCreateDialog.vue'
 
 const accounts = ref([])
 const search = ref('')
@@ -10,6 +11,7 @@ const loading = ref(true)
 const error = ref('')
 const lastUpdated = ref('')
 const toast = ref('')
+const showCreateDialog = ref(false)
 const environmentLabels = {
   dev: '开发环境',
   test: '测试环境',
@@ -89,6 +91,17 @@ function resetFilters() {
   environment.value = 'all'
 }
 
+async function handleCreated() {
+  showCreateDialog.value = false
+  resetFilters()
+  toast.value = '账号已保存'
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toast.value = ''
+  }, 2500)
+  await loadAccounts()
+}
+
 async function copyUsername(username) {
   try {
     await navigator.clipboard.writeText(username)
@@ -165,21 +178,27 @@ onUnmounted(() => {
         <section class="page-heading">
           <div>
             <h1>账号管理</h1>
-            <p class="page-description">
-              集中管理开发与测试账号
-            </p>
+            <p class="page-description">集中管理开发与测试账号</p>
           </div>
-          <button
-            class="button button-primary"
-            :disabled="loading"
-            @click="loadAccounts"
-          >
-            <AppIcon
-              name="refresh"
-              :size="17"
-              :class="{ spinning: loading }"
-            />{{ loading ? '正在加载' : '刷新列表' }}
-          </button>
+          <div class="page-actions">
+            <button
+              class="button button-outline"
+              :disabled="loading"
+              @click="loadAccounts"
+            >
+              <AppIcon
+                name="refresh"
+                :size="17"
+                :class="{ spinning: loading }"
+              />{{ loading ? '正在加载' : '刷新列表' }}
+            </button>
+            <button
+              class="button button-primary"
+              @click="showCreateDialog = true"
+            >
+              新增账号
+            </button>
+          </div>
         </section>
 
         <section class="stats" aria-label="账号概览">
@@ -289,7 +308,7 @@ onUnmounted(() => {
               {{
                 accounts.length
                   ? '试试其他关键词，或调整环境筛选。'
-                  : '添加账号数据后，点击刷新即可在这里查看。'
+                  : '点击“新增账号”开始录入。'
               }}
             </p>
             <button
@@ -364,7 +383,9 @@ onUnmounted(() => {
                     </div>
                   </td>
                   <td>
-                    <span class="mono password-value">{{ account.password || '—' }}</span>
+                    <span class="mono password-value">{{
+                      account.password || '—'
+                    }}</span>
                   </td>
                   <td>
                     <a
@@ -415,6 +436,11 @@ onUnmounted(() => {
         </footer>
       </main>
     </div>
+    <AccountCreateDialog
+      v-if="showCreateDialog"
+      @close="showCreateDialog = false"
+      @created="handleCreated"
+    />
     <div class="toast" role="status" aria-live="polite">
       <template v-if="toast"
         ><AppIcon name="check" :size="18" />{{ toast }}</template

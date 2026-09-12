@@ -214,6 +214,12 @@ main {
   gap: 20px;
   margin-bottom: 31px;
 }
+.page-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
 h1 {
   font-size: 30px;
   font-weight: 650;
