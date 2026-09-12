@@ -1288,10 +1288,6 @@ tbody tr:hover {
 .metric-reading > span {
   color: #77877d;
 }
-.speed-metric p {
-  color: #77877d;
-  line-height: 1.8;
-}
 .website-panel {
   margin-top: 20px;
   padding: 24px;
@@ -1342,7 +1338,6 @@ tbody tr:hover {
 .website-neutral .website-scale { background: #e7ece9; }
 .website-marker { position: absolute; top: -4px; width: 5px; height: 16px; border-radius: 3px; background: var(--website-color); transform: translateX(-50%); }
 .website-scale-labels { display: flex; justify-content: space-between; margin-top: 8px; color: #78857d; }
-.website-card p { color: #78857d; margin-top: 18px; }
 .website-legend { display: flex; flex-wrap: wrap; gap: 12px 24px; margin-bottom: 12px; }
 .website-legend > span { display: inline-flex; align-items: center; gap: 8px; }
 @media (max-width: 1000px) {
@@ -1457,10 +1452,6 @@ tbody tr:hover {
 .guide-dot.red {
   background: #b3261e;
 }
-.stability-guide p {
-  color: #77877d;
-  line-height: 1.8;
-}
 .speed-notes {
   margin-top: 20px;
   padding: 18px 22px;
@@ -1484,11 +1475,6 @@ tbody tr:hover {
 }
 .speed-notes li + li {
   margin-top: 8px;
-}
-.speed-traffic-note {
-  color: #77877d;
-  line-height: 1.8;
-  margin-top: 16px;
 }
 @media (max-width: 1200px) {
   .speed-metrics {

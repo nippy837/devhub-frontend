@@ -118,7 +118,6 @@ const stabilityText = computed(() => {
     <section class="website-panel" aria-labelledby="website-heading">
       <div class="website-panel-heading">
         <h2 id="website-heading">常用网站访问</h2>
-        <span class="muted">网站资源加载耗时</span>
       </div>
       <div class="website-cards">
         <article v-for="site in websites" :key="site.id" class="website-card" :class="`website-${site.quality.tone}`">
@@ -134,7 +133,6 @@ const stabilityText = computed(() => {
             <span v-if="site.quality.position !== null" class="website-marker" :style="{ left: `${site.quality.position}%` }"></span>
           </div>
           <div class="website-scale-labels" aria-hidden="true"><span>0</span><span>1,000+ ms</span></div>
-          <p>{{ site.samples ? `${site.samples} 次有效测量 · 中位数` : '等待有效测量' }}</p>
         </article>
       </div>
       <div class="website-legend">
@@ -142,7 +140,6 @@ const stabilityText = computed(() => {
         <span><i class="guide-dot yellow"></i>中：200～500 ms</span>
         <span><i class="guide-dot red"></i>高：>500 ms</span>
       </div>
-      <p class="muted">本站参考分档，不代表 App 打开速度。</p>
     </section>
     <section class="speed-metrics" aria-label="网络质量">
       <article class="speed-metric">
@@ -151,7 +148,6 @@ const stabilityText = computed(() => {
           <strong>{{ formatMeasurement(state.latency) }}</strong
           ><span>ms</span>
         </div>
-        <p>发出请求后，要等多久才有回应。越低越跟手。</p>
       </article>
       <article class="speed-metric">
         <h2>抖动</h2>
@@ -159,7 +155,6 @@ const stabilityText = computed(() => {
           <strong>{{ formatMeasurement(state.jitter) }}</strong
           ><span>ms</span>
         </div>
-        <p>延迟忽高忽低的程度。越小，通话和游戏越稳。</p>
       </article>
       <article
         class="speed-metric stability-card"
@@ -170,13 +165,6 @@ const stabilityText = computed(() => {
           <span class="stability-dot"></span
           ><strong>{{ stabilityText }}</strong>
         </div>
-        <p>
-          {{
-            ['stopped', 'error'].includes(state.status)
-              ? '本次测速未完成，暂不判断稳定性。'
-              : stability.description
-          }}
-        </p>
       </article>
     </section>
     <section class="speed-detail" aria-label="延迟变化与判定说明">
@@ -208,9 +196,6 @@ const stabilityText = computed(() => {
           <li><span class="guide-dot yellow"></span>黄：10～30 ms，有波动</li>
           <li><span class="guide-dot red"></span>红：抖动 > 30 ms，波动较大</li>
         </ul>
-        <p>
-          这是本站的参考规则，只反映本次测试。至少有 10 个有效样本才会判断。
-        </p>
       </div>
     </section>
     <details class="speed-notes">
@@ -238,8 +223,5 @@ const stabilityText = computed(() => {
         <li>本版暂不测丢包率。请求失败不能直接当成丢包。</li>
       </ul>
     </details>
-    <p class="speed-traffic-note">
-      测速会消耗流量，建议暂停其他下载任务后再测。
-    </p>
   </main>
 </template>
