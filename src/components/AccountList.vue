@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { getAccounts } from '../api/accounts'
 import AppIcon from './AppIcon.vue'
 import AccountCreateDialog from './AccountCreateDialog.vue'
+import { copyText } from '../utils/clipboard.js'
 
 const accounts = ref([])
 const search = ref('')
@@ -102,12 +103,12 @@ async function handleCreated() {
   await loadAccounts()
 }
 
-async function copyUsername(username) {
+async function copyAccountValue(value, label) {
   try {
-    await navigator.clipboard.writeText(username)
-    toast.value = '用户名已复制'
+    await copyText(value)
+    toast.value = `${label}已复制`
   } catch {
-    toast.value = '复制失败，请选中用户名手动复制'
+    toast.value = `复制失败，请选中${label}手动复制`
   }
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => {
@@ -337,16 +338,26 @@ onUnmounted(() => {
                     class="icon-button copy-button"
                     :aria-label="`复制用户名 ${account.username}`"
                     title="复制用户名"
-                    @click="copyUsername(account.username)"
+                    @click="copyAccountValue(account.username, '用户名')"
                   >
                     <AppIcon name="copy" :size="15" />
                   </button>
                 </div>
               </td>
               <td>
-                <span class="mono password-value">{{
-                  account.password || '—'
-                }}</span>
+                <div class="username-cell">
+                  <span class="mono password-value">{{ account.password || '—' }}</span>
+                  <button
+                    v-if="account.password"
+                    type="button"
+                    class="icon-button copy-button"
+                    aria-label="复制密码"
+                    title="复制密码"
+                    @click="copyAccountValue(account.password, '密码')"
+                  >
+                    <AppIcon name="copy" :size="15" />
+                  </button>
+                </div>
               </td>
               <td>
                 <a
