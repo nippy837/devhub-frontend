@@ -10,6 +10,7 @@
     "test": "node --test"
   },
   "dependencies": {
+    "@cloudflare/speedtest": "^1.14.0",
     "diff": "^9.0.0",
     "vue": "^3.5.42"
   },

@@ -3,6 +3,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import AccountList from './components/AccountList.vue'
 import JsonTool from './components/JsonTool.vue'
 import DiffTool from './components/DiffTool.vue'
+import SpeedTool from './components/SpeedTool.vue'
 import AppIcon from './components/AppIcon.vue'
 
 const pages = [
@@ -14,6 +15,7 @@ const pages = [
   },
   { id: 'tools/json', title: 'JSON 格式化', icon: 'code', component: JsonTool },
   { id: 'tools/diff', title: '文本对比', icon: 'compare', component: DiffTool },
+  { id: 'tools/speed', title: '网速测试', icon: 'speed', component: SpeedTool },
 ]
 const hash = ref(location.hash)
 const current = computed(

@@ -2,6 +2,8 @@
 defineProps({ name: String, size: { type: Number, default: 20 } })
 
 const paths = {
+  speed:
+    'M3 18a10 10 0 1 1 18 0 M12 13l5-5 M5 13H3 M7 6l-1-1 M12 3v2 M19 13h2 M10 17h4',
   code: 'M8 4H6v6l-3 2 3 2v6h2 M16 4h2v6l3 2-3 2v6h-2',
   compare: 'M3 7h16 M15 3l4 4-4 4 M21 17H5 M9 13l-4 4 4 4',
   grid: 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',
