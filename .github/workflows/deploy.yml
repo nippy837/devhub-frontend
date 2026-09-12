@@ -1,47 +1,104 @@
 name: Deploy Frontend
 
-# 在 GitHub 页面点击按钮时运行
 on:
+  # 推送到 main 后自动部署，也保留手动运行按钮
+  push:
+    branches: [main]
   workflow_dispatch:
 
-# 本次连接检查不需要访问仓库内容
-permissions: {}
+permissions:
+  contents: read
+
+# 同一时间执行一次前端部署，避免互相覆盖
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: false
 
 jobs:
-  check-connection:
-    # GitHub 提供一台临时 Ubuntu 机器执行这些步骤
+  deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
 
-    # 读取你刚才保存的四个 Secrets
     env:
       SSH_HOST: ${{ secrets.SSH_HOST }}
       SSH_USER: ${{ secrets.SSH_USER }}
-      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-      SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+      # 每次运行使用不同的文件名
+      IMAGE_ARCHIVE: frontend-${{ github.run_id }}-${{ github.run_attempt }}.tar.gz
 
     steps:
+      - name: 获取本次提交的代码
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: 构建并打包前端镜像
+        run: |
+          set -euo pipefail
+
+          # 使用提交编号标记镜像，方便区分版本
+          docker build -t "devhub-frontend:$GITHUB_SHA" .
+
+          # 将镜像导出为压缩文件，稍后上传服务器
+          docker save "devhub-frontend:$GITHUB_SHA" | gzip > "$IMAGE_ARCHIVE"
+
       - name: 配置 SSH 登录凭据
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-
-          # 写入私钥和可信服务器记录，不打印内容
           printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
 
-      - name: 验证服务器连接和部署环境
+      - name: 上传镜像到服务器
         run: |
-          # 禁止交互式密码登录，并严格验证服务器身份
+          scp \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$IMAGE_ARCHIVE" \
+            "$SSH_USER@$SSH_HOST:/home/ubuntu/projects/devhub/$IMAGE_ARCHIVE"
+
+      - name: 更新前端并检查页面
+        run: |
           ssh \
             -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
-            -o ConnectTimeout=15 \
-            "$SSH_USER@$SSH_HOST" '
-              set -eu
-              echo "GitHub Actions 已连接服务器"
-              cd /home/ubuntu/projects/devhub
-              docker compose version
-              docker compose config --quiet
-            '
+            "$SSH_USER@$SSH_HOST" \
+            bash -s -- "$GITHUB_SHA" "$IMAGE_ARCHIVE" <<'REMOTE'
+          set -euo pipefail
+          cd /home/ubuntu/projects/devhub
+
+          # 接收上面传入的提交编号和压缩文件名
+          version="$1"
+          archive="$2"
+
+          # 后续后端部署也使用这把锁，避免同时修改运行中的服务
+          exec 9>.deploy.lock
+          flock -w 300 9
+
+          # 导入镜像，成功后删除上传的压缩文件
+          docker load -i "$archive"
+          rm -f "$archive"
+
+          # 保留上一个版本的镜像，便于需要时恢复
+          if docker image inspect devhub-frontend:latest >/dev/null 2>&1; then
+            docker tag devhub-frontend:latest devhub-frontend:previous
+          fi
+
+          # 将新版本设为 Compose 使用的镜像
+          docker tag "devhub-frontend:$version" devhub-frontend:latest
+
+          # 更新前端；使用已构建的镜像，不重新构建或重启后端
+          docker compose up -d --no-deps --no-build frontend
+
+          # 等待网页能够正常响应，失败时让工作流显示红色
+          curl --fail --silent --show-error \
+            --retry 12 --retry-delay 5 --retry-all-errors \
+            --max-time 10 \
+            http://127.0.0.1/ -o /dev/null
+
+          echo "前端部署成功"
+          REMOTE
