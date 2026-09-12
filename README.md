@@ -1,5 +1,23 @@
-# Vue 3 + Vite
+# DevHub 前端
 
-This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+Vue 3 + Vite，包含账号管理和本地开发工具。
 
-Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
+## 启动与验证
+
+```sh
+npm ci
+npm run dev
+npm test
+npm run build
+```
+
+开发环境的 `/api` 请求代理到 `http://127.0.0.1:8080`。
+
+## 开发工具
+
+通过侧栏进入，也可直接打开 `/#/tools/json` 或 `/#/tools/diff`。两个工具不依赖后端，不上传或持久化输入内容；切换菜单时保留内容，刷新页面后清空。
+
+- **JSON 格式化**：格式校验、2/4 空格缩进、压缩、复制和下载。保留长整数、数值原始写法和重复键。输入上限 200 万字符，格式化结果上限 400 万字符。
+- **文本对比**：逐行对齐，显示行号及新增、删除、修改，修改行内高亮字符差异；支持交换左右、只看差异和忽略行首尾空白。统一处理不同系统的换行符，末尾换行按额外空行参与对比。两侧合计上限 40 万字符、6000 行。
+
+处理在 Web Worker 中运行，耗时过长时提示分段处理。复制需要浏览器支持剪贴板权限；复制失败时可手动选择结果复制。

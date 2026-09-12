@@ -146,305 +146,264 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="workspace">
-    <aside class="sidebar">
-      <a class="brand" href="/" aria-label="DevHub 首页">
-        <span class="brand-symbol"><AppIcon name="grid" :size="19" /></span>
-        <span>DevHub<span class="brand-dot">.</span></span>
-      </a>
-      <nav aria-label="主导航">
-        <p class="nav-heading">资产管理</p>
-        <a class="nav-item active" href="#accounts" aria-current="page">
-          <AppIcon name="accounts" :size="19" /><span>账号管理</span
-          ><span class="nav-dot"></span>
-        </a>
-      </nav>
-      <div class="sidebar-bottom">
-        <div class="workspace-avatar">我</div>
-        <div><strong>我的工作空间</strong></div>
+  <main id="accounts">
+    <section class="page-heading">
+      <div>
+        <h1>账号管理</h1>
+        <p class="page-description">集中管理开发与测试账号</p>
       </div>
-    </aside>
-
-    <div class="main-shell">
-      <header class="topbar">
-        <div class="breadcrumb">
-          <span>工作空间</span><AppIcon name="chevron" :size="13" /><strong
-            >账号管理</strong
-          >
-        </div>
-      </header>
-
-      <main id="accounts">
-        <section class="page-heading">
-          <div>
-            <h1>账号管理</h1>
-            <p class="page-description">集中管理开发与测试账号</p>
-          </div>
-          <div class="page-actions">
-            <button
-              class="button button-outline"
-              :disabled="loading"
-              @click="loadAccounts"
-            >
-              <AppIcon
-                name="refresh"
-                :size="17"
-                :class="{ spinning: loading }"
-              />{{ loading ? '正在加载' : '刷新列表' }}
-            </button>
-            <button
-              class="button button-primary"
-              @click="showCreateDialog = true"
-            >
-              新增账号
-            </button>
-          </div>
-        </section>
-
-        <section class="stats" aria-label="账号概览">
-          <article class="stat-card">
-            <div>
-              <p>全部账号</p>
-              <strong>{{ loading || error ? '—' : accounts.length }}</strong
-              ><span>条账号记录</span>
-            </div>
-            <span class="stat-icon green"
-              ><AppIcon name="accounts" :size="23"
-            /></span>
-          </article>
-          <article class="stat-card">
-            <div>
-              <p>关联系统</p>
-              <strong>{{ loading || error ? '—' : systemCount }}</strong
-              ><span>个独立系统</span>
-            </div>
-            <span class="stat-icon blue"
-              ><AppIcon name="box" :size="23"
-            /></span>
-          </article>
-          <article class="stat-card">
-            <div>
-              <p>测试账号</p>
-              <strong>{{ loading || error ? '—' : testCount }}</strong
-              ><span>条测试环境账号</span>
-            </div>
-            <span class="stat-icon amber"
-              ><AppIcon name="flask" :size="23"
-            /></span>
-          </article>
-        </section>
-
-        <section
-          class="account-panel"
-          aria-labelledby="list-heading"
-          :aria-busy="loading"
+      <div class="page-actions">
+        <button
+          class="button button-outline"
+          :disabled="loading"
+          @click="loadAccounts"
         >
-          <div class="panel-heading">
-            <div>
-              <h2 id="list-heading">
-                账号列表
-                <span class="count-badge">{{
-                  loading || error ? '—' : accounts.length
-                }}</span>
-              </h2>
-            </div>
-          </div>
-          <div class="toolbar">
-            <div class="search-field">
-              <AppIcon name="search" :size="18" /><label
-                class="sr-only"
-                for="account-search"
-                >搜索系统、用户名或备注</label
-              ><input
-                id="account-search"
-                v-model="search"
-                type="search"
-                placeholder="搜索系统、用户名或备注…"
-              /><button
-                v-if="search"
-                class="icon-button"
-                aria-label="清空搜索"
-                @click="search = ''"
-              >
-                <AppIcon name="close" :size="15" />
-              </button>
-            </div>
-            <div class="environment-filter">
-              <label for="environment">环境</label
-              ><select id="environment" v-model="environment">
-                <option value="all">全部环境</option>
-                <option v-for="item in environments" :key="item" :value="item">
-                  {{ environmentLabels[item] || item }}
-                </option>
-              </select>
-            </div>
-          </div>
+          <AppIcon name="refresh" :size="17" :class="{ spinning: loading }" />{{
+            loading ? '正在加载' : '刷新列表'
+          }}
+        </button>
+        <button class="button button-primary" @click="showCreateDialog = true">
+          新增账号
+        </button>
+      </div>
+    </section>
 
-          <div v-if="loading" class="state-panel" role="status">
-            <span class="loading-ring"></span>
-            <h3>正在加载账号</h3>
-            <p>请稍候，正在获取最新列表。</p>
-          </div>
-          <div v-else-if="error" class="state-panel" role="alert">
-            <span class="state-icon error-icon"
-              ><AppIcon name="alert" :size="27"
-            /></span>
-            <h3>暂时无法加载账号</h3>
-            <p>{{ error }}</p>
-            <button class="button button-outline" @click="loadAccounts">
-              重新加载
-            </button>
-          </div>
-          <div v-else-if="!filteredAccounts.length" class="state-panel">
-            <span class="state-icon"
-              ><AppIcon
-                :name="accounts.length ? 'search' : 'accounts'"
-                :size="28"
-            /></span>
-            <h3>
-              {{ accounts.length ? '没有找到匹配的账号' : '还没有账号记录' }}
-            </h3>
-            <p>
-              {{
-                accounts.length
-                  ? '试试其他关键词，或调整环境筛选。'
-                  : '点击“新增账号”开始录入。'
-              }}
-            </p>
-            <button
-              v-if="accounts.length"
-              class="button button-outline"
-              @click="resetFilters"
-            >
-              清除筛选
-            </button>
-          </div>
-          <div
-            v-else
-            class="table-scroll"
-            tabindex="0"
-            aria-label="账号列表，可横向滚动"
+    <section class="stats" aria-label="账号概览">
+      <article class="stat-card">
+        <div>
+          <p>全部账号</p>
+          <strong>{{ loading || error ? '—' : accounts.length }}</strong
+          ><span>条账号记录</span>
+        </div>
+        <span class="stat-icon green"
+          ><AppIcon name="accounts" :size="23"
+        /></span>
+      </article>
+      <article class="stat-card">
+        <div>
+          <p>关联系统</p>
+          <strong>{{ loading || error ? '—' : systemCount }}</strong
+          ><span>个独立系统</span>
+        </div>
+        <span class="stat-icon blue"><AppIcon name="box" :size="23" /></span>
+      </article>
+      <article class="stat-card">
+        <div>
+          <p>测试账号</p>
+          <strong>{{ loading || error ? '—' : testCount }}</strong
+          ><span>条测试环境账号</span>
+        </div>
+        <span class="stat-icon amber"><AppIcon name="flask" :size="23" /></span>
+      </article>
+    </section>
+
+    <section
+      class="account-panel"
+      aria-labelledby="list-heading"
+      :aria-busy="loading"
+    >
+      <div class="panel-heading">
+        <div>
+          <h2 id="list-heading">
+            账号列表
+            <span class="count-badge">{{
+              loading || error ? '—' : accounts.length
+            }}</span>
+          </h2>
+        </div>
+      </div>
+      <div class="toolbar">
+        <div class="search-field">
+          <AppIcon name="search" :size="18" /><label
+            class="sr-only"
+            for="account-search"
+            >搜索系统、用户名或备注</label
+          ><input
+            id="account-search"
+            v-model="search"
+            type="search"
+            placeholder="搜索系统、用户名或备注…"
+          /><button
+            v-if="search"
+            class="icon-button"
+            aria-label="清空搜索"
+            @click="search = ''"
           >
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">所属系统</th>
-                  <th scope="col">环境</th>
-                  <th scope="col">用户名</th>
-                  <th scope="col">密码</th>
-                  <th scope="col">登录地址</th>
-                  <th scope="col">备注</th>
-                  <th scope="col">更新时间</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="account in filteredAccounts" :key="account.id">
-                  <td>
-                    <div class="system-cell">
-                      <span class="system-avatar">{{
-                        (account.systemName || '?').slice(0, 1).toUpperCase()
-                      }}</span>
-                      <div>
-                        <strong>{{ account.systemName || '未命名系统' }}</strong
-                        ><span class="record-id"
-                          >编号 {{ String(account.id).padStart(3, '0') }}</span
-                        >
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <span
-                      class="environment-badge"
-                      :class="
-                        ['dev', 'test', 'prod'].includes(account.environment)
-                          ? account.environment
-                          : 'other'
-                      "
-                      ><span></span
-                      >{{
-                        environmentLabels[account.environment] ||
-                        account.environment ||
-                        '未设置'
-                      }}</span
-                    >
-                  </td>
-                  <td>
-                    <div class="username-cell">
-                      <span class="mono">{{ account.username || '—' }}</span
-                      ><button
-                        v-if="account.username"
-                        class="icon-button copy-button"
-                        :aria-label="`复制用户名 ${account.username}`"
-                        title="复制用户名"
-                        @click="copyUsername(account.username)"
-                      >
-                        <AppIcon name="copy" :size="15" />
-                      </button>
-                    </div>
-                  </td>
-                  <td>
-                    <span class="mono password-value">{{
-                      account.password || '—'
-                    }}</span>
-                  </td>
-                  <td>
-                    <a
-                      v-if="loginHref(account.loginUrl)"
-                      class="login-link"
-                      :href="loginHref(account.loginUrl)"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      :title="account.loginUrl"
-                      >{{ loginLabel(account.loginUrl)
-                      }}<AppIcon name="arrow" :size="15" /><span class="sr-only"
-                        >（在新标签页打开）</span
-                      ></a
-                    ><span v-else class="muted">{{
-                      account.loginUrl ? '地址不可用' : '未设置'
-                    }}</span>
-                  </td>
-                  <td>
-                    <span class="remark" :title="account.remark || ''">{{
-                      account.remark || '—'
-                    }}</span>
-                  </td>
-                  <td
-                    class="date-cell"
-                    :title="`创建时间：${formatTime(account.createTime)}`"
-                  >
-                    {{ formatTime(account.updateTime) }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <footer class="table-footer">
-            <span aria-live="polite">{{
-              loading
-                ? '正在获取数据…'
-                : error
-                  ? '加载失败'
-                  : `${filteredAccounts.length}/${accounts.length}`
-            }}</span
-            ><span v-if="lastUpdated && !error && !loading" class="sync-time"
-              ><span></span>更新于 {{ lastUpdated }}</span
-            >
-          </footer>
-        </section>
-        <footer class="page-footer">
-          <span>个人开发工作空间</span>
-        </footer>
-      </main>
-    </div>
-    <AccountCreateDialog
-      v-if="showCreateDialog"
-      @close="showCreateDialog = false"
-      @created="handleCreated"
-    />
-    <div class="toast" role="status" aria-live="polite">
-      <template v-if="toast"
-        ><AppIcon name="check" :size="18" />{{ toast }}</template
+            <AppIcon name="close" :size="15" />
+          </button>
+        </div>
+        <div class="environment-filter">
+          <label for="environment">环境</label
+          ><select id="environment" v-model="environment">
+            <option value="all">全部环境</option>
+            <option v-for="item in environments" :key="item" :value="item">
+              {{ environmentLabels[item] || item }}
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <div v-if="loading" class="state-panel" role="status">
+        <span class="loading-ring"></span>
+        <h3>正在加载账号</h3>
+        <p>请稍候，正在获取最新列表。</p>
+      </div>
+      <div v-else-if="error" class="state-panel" role="alert">
+        <span class="state-icon error-icon"
+          ><AppIcon name="alert" :size="27"
+        /></span>
+        <h3>暂时无法加载账号</h3>
+        <p>{{ error }}</p>
+        <button class="button button-outline" @click="loadAccounts">
+          重新加载
+        </button>
+      </div>
+      <div v-else-if="!filteredAccounts.length" class="state-panel">
+        <span class="state-icon"
+          ><AppIcon :name="accounts.length ? 'search' : 'accounts'" :size="28"
+        /></span>
+        <h3>
+          {{ accounts.length ? '没有找到匹配的账号' : '还没有账号记录' }}
+        </h3>
+        <p>
+          {{
+            accounts.length
+              ? '试试其他关键词，或调整环境筛选。'
+              : '点击“新增账号”开始录入。'
+          }}
+        </p>
+        <button
+          v-if="accounts.length"
+          class="button button-outline"
+          @click="resetFilters"
+        >
+          清除筛选
+        </button>
+      </div>
+      <div
+        v-else
+        class="table-scroll"
+        tabindex="0"
+        aria-label="账号列表，可横向滚动"
       >
-    </div>
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">所属系统</th>
+              <th scope="col">环境</th>
+              <th scope="col">用户名</th>
+              <th scope="col">密码</th>
+              <th scope="col">登录地址</th>
+              <th scope="col">备注</th>
+              <th scope="col">更新时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="account in filteredAccounts" :key="account.id">
+              <td>
+                <div class="system-cell">
+                  <span class="system-avatar">{{
+                    (account.systemName || '?').slice(0, 1).toUpperCase()
+                  }}</span>
+                  <div>
+                    <strong>{{ account.systemName || '未命名系统' }}</strong
+                    ><span class="record-id"
+                      >编号 {{ String(account.id).padStart(3, '0') }}</span
+                    >
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span
+                  class="environment-badge"
+                  :class="
+                    ['dev', 'test', 'prod'].includes(account.environment)
+                      ? account.environment
+                      : 'other'
+                  "
+                  ><span></span
+                  >{{
+                    environmentLabels[account.environment] ||
+                    account.environment ||
+                    '未设置'
+                  }}</span
+                >
+              </td>
+              <td>
+                <div class="username-cell">
+                  <span class="mono">{{ account.username || '—' }}</span
+                  ><button
+                    v-if="account.username"
+                    class="icon-button copy-button"
+                    :aria-label="`复制用户名 ${account.username}`"
+                    title="复制用户名"
+                    @click="copyUsername(account.username)"
+                  >
+                    <AppIcon name="copy" :size="15" />
+                  </button>
+                </div>
+              </td>
+              <td>
+                <span class="mono password-value">{{
+                  account.password || '—'
+                }}</span>
+              </td>
+              <td>
+                <a
+                  v-if="loginHref(account.loginUrl)"
+                  class="login-link"
+                  :href="loginHref(account.loginUrl)"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  :title="account.loginUrl"
+                  >{{ loginLabel(account.loginUrl)
+                  }}<AppIcon name="arrow" :size="15" /><span class="sr-only"
+                    >（在新标签页打开）</span
+                  ></a
+                ><span v-else class="muted">{{
+                  account.loginUrl ? '地址不可用' : '未设置'
+                }}</span>
+              </td>
+              <td>
+                <span class="remark" :title="account.remark || ''">{{
+                  account.remark || '—'
+                }}</span>
+              </td>
+              <td
+                class="date-cell"
+                :title="`创建时间：${formatTime(account.createTime)}`"
+              >
+                {{ formatTime(account.updateTime) }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <footer class="table-footer">
+        <span aria-live="polite">{{
+          loading
+            ? '正在获取数据…'
+            : error
+              ? '加载失败'
+              : `${filteredAccounts.length}/${accounts.length}`
+        }}</span
+        ><span v-if="lastUpdated && !error && !loading" class="sync-time"
+          ><span></span>更新于 {{ lastUpdated }}</span
+        >
+      </footer>
+    </section>
+    <footer class="page-footer">
+      <span>个人开发工作空间</span>
+    </footer>
+  </main>
+  <AccountCreateDialog
+    v-if="showCreateDialog"
+    @close="showCreateDialog = false"
+    @created="handleCreated"
+  />
+  <div class="toast" role="status" aria-live="polite">
+    <template v-if="toast"
+      ><AppIcon name="check" :size="18" />{{ toast }}</template
+    >
   </div>
 </template>
