@@ -868,8 +868,7 @@ tbody tr:hover {
   border-radius: 12px;
   overflow: hidden;
 }
-.tool-actions,
-.diff-summary {
+.tool-actions {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -979,110 +978,6 @@ tbody tr:hover {
 .code-editor[readonly] {
   background: #fcfdfc;
 }
-.diff-inputs .code-editor {
-  min-height: 250px;
-}
-.diff-result {
-  margin-top: 24px;
-}
-.diff-summary h2 {
-  font-size: 18px;
-  margin-right: 8px;
-}
-.diff-summary .tool-checkbox {
-  margin-left: auto;
-}
-.diff-success {
-  color: #176b51;
-}
-.diff-deleted {
-  color: #aa4034;
-}
-.diff-scroll {
-  overflow: auto;
-  max-height: 650px;
-  border-top: 1px solid var(--border);
-}
-.diff-scroll:focus-visible {
-  outline: 2px solid #84bda7;
-  outline-offset: -2px;
-}
-.diff-columns,
-.diff-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  min-width: 580px;
-}
-.diff-columns {
-  position: sticky;
-  top: 0;
-  background: #f7f9f8;
-  z-index: 1;
-  border-bottom: 1px solid var(--border);
-}
-.diff-columns strong {
-  padding: 12px 18px;
-}
-.diff-cell {
-  display: flex;
-  min-width: 0;
-  padding: 5px 10px 5px 0;
-  border-bottom: 1px solid #f0f3f1;
-  line-height: 1.8;
-}
-.diff-cell.right,
-.diff-columns strong + strong {
-  border-left: 1px solid var(--border);
-}
-.line-number {
-  flex: 0 0 48px;
-  text-align: right;
-  padding-right: 8px;
-  color: #7c8881;
-  user-select: none;
-  font-variant-numeric: tabular-nums;
-}
-.line-sign {
-  flex: 0 0 20px;
-  user-select: none;
-}
-.diff-cell code {
-  font:
-    14px/1.8 ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    Consolas,
-    monospace;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  min-width: 0;
-}
-.diff-removed .left,
-.diff-changed .left {
-  background: #fff0ed;
-}
-.diff-added .right,
-.diff-changed .right {
-  background: #edf8ef;
-}
-.left .changed-text {
-  background: #facfc5;
-}
-.right .changed-text {
-  background: #bde9c8;
-}
-.diff-cell.empty-cell {
-  background: #f5f7f6;
-}
-@media (max-width: 1100px) and (min-width: 801px) {
-  .editor-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .editor-pane + .editor-pane {
-    border-left: 0;
-    border-top: 1px solid var(--border);
-  }
-}
 @media (max-width: 800px) {
   .sidebar {
     height: auto;
@@ -1122,14 +1017,115 @@ tbody tr:hover {
   .code-editor {
     min-height: 280px;
   }
-  .tool-actions,
-  .diff-summary {
+  .tool-actions {
     padding: 16px;
   }
   .tool-clear {
     margin-left: 0;
   }
-  .diff-summary .tool-checkbox {
-    margin-left: 0;
+}
+
+.json-editor {
+  border-top: 1px solid var(--border);
+}
+.json-editor .code-editor {
+  min-height: 520px;
+}
+.file-import {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.file-error {
+  color: #b3261e;
+  overflow-wrap: anywhere;
+}
+.editor-heading {
+  flex-wrap: wrap;
+}
+.editor-heading .file-import {
+  margin-left: auto;
+}
+.editor-heading .file-error {
+  flex-basis: 100%;
+}
+.difference-status {
+  color: #b3261e;
+}
+.highlight-editor {
+  position: relative;
+  height: clamp(420px, 62vh, 760px);
+}
+.highlight-editor .code-editor,
+.highlight-backdrop {
+  margin: 0;
+  padding: 18px;
+  border: 0;
+  border-radius: 0;
+  font:
+    14px/1.8 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+  letter-spacing: normal;
+  word-spacing: normal;
+  tab-size: 2;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+  text-align: left;
+}
+.highlight-editor .code-editor {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  resize: none;
+  background: transparent;
+  overflow: auto;
+}
+.highlight-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  visibility: hidden;
+  color: #273b34;
+}
+.has-highlights .highlight-backdrop {
+  visibility: visible;
+}
+.has-highlights .code-editor {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: #273b34;
+}
+.has-highlights .code-editor::selection {
+  background: #b3d8ec80;
+}
+.red-difference {
+  color: #b3261e;
+  background: #ffe0dc;
+  box-shadow: 0 1px 0 #d55449;
+}
+.blank-difference {
+  position: relative;
+}
+.blank-difference::after {
+  position: absolute;
+  left: 0;
+  top: 0;
+  content: '↵';
+  color: #b3261e;
+  background: #ffe0dc;
+}
+@media (max-width: 600px) {
+  .highlight-editor {
+    height: 320px;
+  }
+  .json-editor .code-editor {
+    min-height: 420px;
   }
 }

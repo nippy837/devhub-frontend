@@ -76,6 +76,9 @@ export function compareText(left, right, ignoreWhitespace = false) {
       const a = n < removed ? cell(oldLines[oldIndex], ++oldIndex) : null
       const b = n < added ? cell(newLines[newIndex], ++newIndex) : null
       const kind = a && b ? 'changed' : a ? 'removed' : 'added'
+      for (const side of [a, b]) {
+        if (side) side.segments[0].changed = true
+      }
       if (a && b) {
         const parts = diffChars(a.text, b.text, {
           timeout: 10,
@@ -88,6 +91,8 @@ export function compareText(left, right, ignoreWhitespace = false) {
           b.segments = parts
             .filter((p) => !p.removed)
             .map((p) => ({ text: p.value, changed: !!p.added }))
+          if (!a.segments.length) a.segments = [{ text: '', changed: true }]
+          if (!b.segments.length) b.segments = [{ text: '', changed: true }]
         }
       }
       counts[kind]++

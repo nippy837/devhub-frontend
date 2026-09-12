@@ -1,45 +1,60 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useToolTask } from '../composables/useToolTask'
+import HighlightEditor from './HighlightEditor.vue'
+import FileImport from './FileImport.vue'
 
 const left = ref('')
 const right = ref('')
 const ignoreWhitespace = ref(false)
-const onlyChanges = ref(false)
 const result = ref(null)
+const resetKey = ref(0)
 const { busy, error, run, cancel } = useToolTask()
+let debounce
 watch(
   [left, right, ignoreWhitespace],
   () => {
+    clearTimeout(debounce)
     cancel()
     result.value = null
     error.value = ''
+    if (left.value === right.value) return
+    debounce = setTimeout(() => {
+      run(
+        'diff',
+        [left.value, right.value, ignoreWhitespace.value],
+        (value) => {
+          result.value = value
+        },
+      )
+    }, 150)
   },
   { flush: 'sync' },
 )
-const rows = computed(() =>
-  (result.value?.rows || []).filter(
-    (row) => !onlyChanges.value || row.kind !== 'equal',
-  ),
+onUnmounted(() => clearTimeout(debounce))
+const leftLines = computed(
+  () =>
+    result.value?.rows.filter((row) => row.left).map((row) => row.left) || [],
 )
-const identical = computed(
+const rightLines = computed(
+  () =>
+    result.value?.rows.filter((row) => row.right).map((row) => row.right) || [],
+)
+const differences = computed(
   () =>
     result.value &&
-    Object.values(result.value.counts).every((count) => count === 0),
+    Object.values(result.value.counts).some((count) => count > 0),
 )
-function compare() {
-  result.value = null
-  run('diff', [left.value, right.value, ignoreWhitespace.value], (value) => {
-    result.value = value
-  })
-}
 function swap() {
+  resetKey.value++
   ;[left.value, right.value] = [right.value, left.value]
 }
 function clear() {
-  cancel()
+  resetKey.value++
   left.value = ''
   right.value = ''
+  clearTimeout(debounce)
+  cancel()
   result.value = null
   error.value = ''
 }
@@ -49,13 +64,10 @@ function clear() {
   <main class="tool-page">
     <section class="page-heading">
       <h1>文本对比</h1>
-      <span class="muted">本地处理，不上传内容</span>
+      <span class="muted">文件与内容仅在本地处理</span>
     </section>
     <section class="tool-panel" aria-label="文本编辑器" :aria-busy="busy">
       <div class="tool-actions">
-        <button class="button button-primary" :disabled="busy" @click="compare">
-          {{ busy ? '对比中…' : '开始对比' }}
-        </button>
         <button class="button button-outline" @click="swap">交换左右</button>
         <label class="tool-checkbox"
           ><input
@@ -63,108 +75,50 @@ function clear() {
             type="checkbox"
           />忽略行首尾空白</label
         >
+        <span v-if="differences" class="difference-status" role="status"
+          >差异已标红</span
+        >
         <button class="button button-outline tool-clear" @click="clear">
           清空
         </button>
       </div>
       <p v-if="error" class="tool-error" role="alert">{{ error }}</p>
-      <div class="editor-grid diff-inputs">
+      <div class="editor-grid live-diff-inputs">
         <div class="editor-pane">
           <div class="editor-heading">
-            <label for="diff-left">原始文本</label
-            ><span class="muted">{{ left.length }} 字符</span>
+            <label for="diff-left">左侧文本</label
+            ><FileImport
+              label="导入左侧文件"
+              :max-characters="400000"
+              :content="left"
+              :reset-key="resetKey"
+              @loaded="left = $event"
+            />
           </div>
-          <textarea
+          <HighlightEditor
             id="diff-left"
             v-model="left"
-            class="code-editor"
-            spellcheck="false"
-            autocapitalize="off"
-            autocomplete="off"
-            placeholder="粘贴原始文本"
-          ></textarea>
+            :lines="leftLines"
+            placeholder="粘贴或导入文本，自动对比"
+          />
         </div>
         <div class="editor-pane">
           <div class="editor-heading">
-            <label for="diff-right">修改后文本</label
-            ><span class="muted">{{ right.length }} 字符</span>
+            <label for="diff-right">右侧文本</label
+            ><FileImport
+              label="导入右侧文件"
+              :max-characters="400000"
+              :content="right"
+              :reset-key="resetKey"
+              @loaded="right = $event"
+            />
           </div>
-          <textarea
+          <HighlightEditor
             id="diff-right"
             v-model="right"
-            class="code-editor"
-            spellcheck="false"
-            autocapitalize="off"
-            autocomplete="off"
-            placeholder="粘贴修改后的文本"
-          ></textarea>
-        </div>
-      </div>
-    </section>
-    <section v-if="result" class="tool-panel diff-result" aria-label="对比结果">
-      <div class="diff-summary" role="status">
-        <h2>对比结果</h2>
-        <span v-if="identical" class="diff-success">{{
-          ignoreWhitespace ? '文本一致（忽略行首尾空白）' : '文本一致'
-        }}</span>
-        <template v-else
-          ><span class="diff-success">+ {{ result.counts.added }} 新增</span
-          ><span class="diff-deleted">− {{ result.counts.removed }} 删除</span
-          ><span>~ {{ result.counts.changed }} 修改</span></template
-        >
-        <label class="tool-checkbox"
-          ><input v-model="onlyChanges" type="checkbox" />只看差异</label
-        >
-      </div>
-      <div
-        v-if="rows.length"
-        class="diff-scroll"
-        tabindex="0"
-        aria-label="逐行对比，左右分别为原始和修改后文本"
-      >
-        <div class="diff-columns">
-          <strong>原始文本</strong><strong>修改后文本</strong>
-        </div>
-        <div
-          v-for="(row, index) in rows"
-          :key="index"
-          class="diff-row"
-          :class="`diff-${row.kind}`"
-        >
-          <div
-            v-for="side in ['left', 'right']"
-            :key="side"
-            class="diff-cell"
-            :class="[side, { 'empty-cell': !row[side] }]"
-          >
-            <template v-if="row[side]">
-              <span class="line-number">{{ row[side].number }}</span
-              ><span
-                class="line-sign"
-                :aria-label="
-                  row.kind === 'equal'
-                    ? '未变'
-                    : side === 'left'
-                      ? '删除'
-                      : '新增'
-                "
-                >{{
-                  row.kind === 'equal' ? ' ' : side === 'left' ? '−' : '+'
-                }}</span
-              >
-              <code
-                ><template
-                  v-for="(segment, segmentIndex) in row[side].segments"
-                  :key="segmentIndex"
-                  ><span :class="{ 'changed-text': segment.changed }">{{
-                    segment.text
-                  }}</span></template
-                ><span v-if="row[side].text === ''" class="muted"
-                  >（空行）</span
-                ></code
-              >
-            </template>
-          </div>
+            :lines="rightLines"
+            placeholder="粘贴或导入文本，自动对比"
+          />
         </div>
       </div>
     </section>

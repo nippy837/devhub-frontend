@@ -94,3 +94,48 @@ test('reconstructs original sides across varied edits', () => {
       )
     }
 })
+
+test('marks added, removed and blank lines for inline red highlights', () => {
+  const inserted = compareText('a', 'a\nb\n').rows.filter(
+    (row) => row.kind === 'added',
+  )
+  assert.ok(
+    inserted.every((row) => row.right.segments.every((part) => part.changed)),
+  )
+  assert.equal(inserted[1].right.segments[0].text, '')
+  const removed = compareText('a\nb', 'a').rows.find(
+    (row) => row.kind === 'removed',
+  )
+  assert.equal(removed.left.segments[0].changed, true)
+})
+test('unchanged texts have no highlight segments, including ignored whitespace', () => {
+  for (const result of [
+    compareText('相同\n内容', '相同\n内容'),
+    compareText(' a ', 'a', true),
+  ]) {
+    assert.ok(
+      result.rows.every((row) =>
+        [...row.left.segments, ...row.right.segments].every(
+          (part) => !part.changed,
+        ),
+      ),
+    )
+  }
+})
+test('inline highlights retain exact content including tabs, emoji and HTML-like text', () => {
+  const left = '标题\n\t甲😀<b>原文</b>\n'
+  const right = '标题\n\t乙😀<b>新文</b>\n'
+  const result = compareText(left, right)
+  for (const [side, expected] of [
+    ['left', left],
+    ['right', right],
+  ]) {
+    assert.equal(
+      result.rows
+        .filter((row) => row[side])
+        .map((row) => row[side].segments.map((part) => part.text).join(''))
+        .join('\n'),
+      expected,
+    )
+  }
+})

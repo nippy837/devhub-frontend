@@ -20,16 +20,20 @@ export function useToolTask() {
         new URL('../workers/developerTools.js', import.meta.url),
         { type: 'module' },
       )
+      const currentWorker = worker
       worker.onmessage = ({ data }) => {
+        if (worker !== currentWorker) return
         cancel()
         if (data.error) error.value = data.error
         else done(data.result)
       }
       worker.onerror = () => {
+        if (worker !== currentWorker) return
         cancel()
         error.value = '处理失败，请重试'
       }
       timer = setTimeout(() => {
+        if (worker !== currentWorker) return
         cancel()
         error.value = '处理超时，请减少内容后重试'
       }, 5000)
