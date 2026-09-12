@@ -40,11 +40,6 @@ const rightLines = computed(
   () =>
     result.value?.rows.filter((row) => row.right).map((row) => row.right) || [],
 )
-const differences = computed(
-  () =>
-    result.value &&
-    Object.values(result.value.counts).some((count) => count > 0),
-)
 function swap() {
   resetKey.value++
   ;[left.value, right.value] = [right.value, left.value]
@@ -74,9 +69,6 @@ function clear() {
             v-model="ignoreWhitespace"
             type="checkbox"
           />忽略行首尾空白</label
-        >
-        <span v-if="differences" class="difference-status" role="status"
-          >差异已标红</span
         >
         <button class="button button-outline tool-clear" @click="clear">
           清空

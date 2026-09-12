@@ -1051,9 +1051,6 @@ tbody tr:hover {
 .editor-heading .file-error {
   flex-basis: 100%;
 }
-.difference-status {
-  color: #b3261e;
-}
 .highlight-editor {
   position: relative;
   height: clamp(420px, 62vh, 760px);
