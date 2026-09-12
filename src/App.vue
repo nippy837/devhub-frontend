@@ -1,7 +1,7 @@
 <script setup>
-import HelloWorld from './components/HelloWorld.vue'
+import AccountList from './components/AccountList.vue'
 </script>
 
 <template>
-  <HelloWorld />
+  <AccountList />
 </template>
