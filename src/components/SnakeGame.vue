@@ -354,6 +354,12 @@ kbd { min-width: 52px; text-align: center; border: 1px solid #dce5df; border-bot
   .snake-layout { grid-template-columns: minmax(0, 1fr); max-width: 680px; }
   .snake-guide { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .snake-mobile-controls { display: block; }
+  .snake-mobile-controls .snake-dpad {
+    grid-template-columns: repeat(3, 60px);
+    grid-template-rows: repeat(2, 60px);
+    gap: 24px;
+  }
+  .snake-mobile-controls .snake-dpad button { font-size: 28px; border-radius: 12px; }
   .snake-desktop-controls { display: none; }
 }
 @media (max-width: 500px) {
