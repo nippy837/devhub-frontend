@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onDeactivated, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue'
 import { getAccounts } from '../api/accounts'
 import AppIcon from './AppIcon.vue'
 import AccountFormDialog from './AccountFormDialog.vue'
@@ -24,40 +24,36 @@ const environmentLabels = {
 let requestController
 let toastTimer
 
-const environments = computed(() => [
-  ...new Set(
-    accounts.value.map((account) => account.environment).filter(Boolean),
-  ),
-])
-const systemCount = computed(
-  () =>
-    new Set(accounts.value.map((account) => account.systemName).filter(Boolean))
-      .size,
-)
-const testCount = computed(
-  () =>
-    accounts.value.filter((account) => account.environment === 'test').length,
-)
-// 当前搜索与环境筛选基于已加载列表，不额外请求后端，也没有服务端分页。
-const filteredAccounts = computed(() => {
-  const keyword = search.value.trim().toLowerCase()
-  return accounts.value.filter((account) => {
-    const matchesEnvironment =
-      environment.value === 'all' || account.environment === environment.value
-    const matchesSearch = [
-      account.systemName,
-      account.username,
-      account.remark,
-    ].some((value) =>
-      String(value ?? '')
-        .toLowerCase()
-        .includes(keyword),
-    )
-    return matchesEnvironment && matchesSearch
-  })
-})
+const page = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
+const stats = ref({ totalAccounts: 0, systemCount: 0, testCount: 0 })
+const environments = ref([])
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
+const hasFilters = computed(() => Boolean(search.value.trim()) || environment.value !== 'all')
+const firstRecord = computed(() => total.value ? (page.value - 1) * pageSize.value + 1 : 0)
+let searchTimer
+
+// 输入搜索词时等待300ms再查询；筛选或条数变化立即查询，并回到第一页。
+// 同步撤销旧请求，避免它在防抖等待期间覆盖新筛选条件对应的页面。
+watch([search, environment, pageSize], (values, previous) => {
+  clearTimeout(searchTimer)
+  requestController?.abort()
+  requestController = null
+  page.value = 1
+  loading.value = true
+  error.value = ''
+  searchTimer = setTimeout(loadAccounts, values[0] !== previous[0] ? 300 : 0)
+}, { flush: 'sync' })
+
+function changePage(nextPage) {
+  if (loading.value || nextPage < 1 || nextPage > totalPages.value) return
+  page.value = nextPage
+  loadAccounts()
+}
 
 async function loadAccounts() {
+  clearTimeout(searchTimer)
   requestController?.abort()
   const controller = new AbortController()
   requestController = controller
@@ -66,16 +62,24 @@ async function loadAccounts() {
   const timeout = setTimeout(() => controller.abort(), 10000)
 
   try {
-    const data = await getAccounts(controller.signal)
+    const data = await getAccounts({
+      page: page.value,
+      pageSize: pageSize.value,
+      keyword: search.value,
+      environment: environment.value === 'all' ? '' : environment.value,
+    }, controller.signal)
     // 连续刷新时，旧请求即使稍后返回，也不能覆盖最新一次请求的结果。
     if (requestController !== controller) return
-    accounts.value = data
-    if (
-      environment.value !== 'all' &&
-      !environments.value.includes(environment.value)
-    ) {
-      environment.value = 'all'
-    }
+    accounts.value = data.records
+    total.value = data.total
+    // 后端会修正越界页码，删除末页最后一条后无需再次发送请求。
+    page.value = data.page
+    stats.value = data.stats
+    // 当前筛选可能因删除变成空环境，保留选项方便用户理解空结果。
+    environments.value = [...new Set([
+      ...data.environments,
+      ...(environment.value === 'all' ? [] : [environment.value]),
+    ])]
     lastUpdated.value = new Date().toLocaleTimeString('zh-CN', {
       hour12: false,
     })
@@ -116,7 +120,10 @@ async function handleSaved(editing) {
   showFormDialog.value = false
   editingAccount.value = null
   // 新增后清空筛选，便于找到新账号；编辑后保留用户正在查看的筛选条件。
-  if (!editing) resetFilters()
+  if (!editing) {
+    resetFilters()
+    page.value = 1
+  }
   showToast(editing ? '账号已更新' : '账号已保存')
   await loadAccounts()
 }
@@ -173,6 +180,7 @@ onUnmounted(() => {
   requestController?.abort()
   requestController = null
   clearTimeout(toastTimer)
+  clearTimeout(searchTimer)
 })
 </script>
 
@@ -203,7 +211,7 @@ onUnmounted(() => {
       <article class="stat-card">
         <div>
           <p>全部账号</p>
-          <strong>{{ loading || error ? '—' : accounts.length }}</strong
+          <strong>{{ loading || error ? '—' : stats.totalAccounts }}</strong
           ><span>条账号记录</span>
         </div>
         <span class="stat-icon green"
@@ -213,7 +221,7 @@ onUnmounted(() => {
       <article class="stat-card">
         <div>
           <p>关联系统</p>
-          <strong>{{ loading || error ? '—' : systemCount }}</strong
+          <strong>{{ loading || error ? '—' : stats.systemCount }}</strong
           ><span>个独立系统</span>
         </div>
         <span class="stat-icon blue"><AppIcon name="box" :size="23" /></span>
@@ -221,7 +229,7 @@ onUnmounted(() => {
       <article class="stat-card">
         <div>
           <p>测试账号</p>
-          <strong>{{ loading || error ? '—' : testCount }}</strong
+          <strong>{{ loading || error ? '—' : stats.testCount }}</strong
           ><span>条测试环境账号</span>
         </div>
         <span class="stat-icon amber"><AppIcon name="flask" :size="23" /></span>
@@ -238,7 +246,7 @@ onUnmounted(() => {
           <h2 id="list-heading">
             账号列表
             <span class="count-badge">{{
-              loading || error ? '—' : accounts.length
+              loading || error ? '—' : total
             }}</span>
           </h2>
         </div>
@@ -253,6 +261,7 @@ onUnmounted(() => {
             id="account-search"
             v-model="search"
             type="search"
+            maxlength="500"
             placeholder="搜索系统、用户名或备注…"
           /><button
             v-if="search"
@@ -289,22 +298,22 @@ onUnmounted(() => {
           重新加载
         </button>
       </div>
-      <div v-else-if="!filteredAccounts.length" class="state-panel">
+      <div v-else-if="!accounts.length" class="state-panel">
         <span class="state-icon"
-          ><AppIcon :name="accounts.length ? 'search' : 'accounts'" :size="28"
+          ><AppIcon :name="hasFilters ? 'search' : 'accounts'" :size="28"
         /></span>
         <h3>
-          {{ accounts.length ? '没有找到匹配的账号' : '还没有账号记录' }}
+          {{ hasFilters ? '没有找到匹配的账号' : '还没有账号记录' }}
         </h3>
         <p>
           {{
-            accounts.length
+            hasFilters
               ? '试试其他关键词，或调整环境筛选。'
               : '点击“新增账号”开始录入。'
           }}
         </p>
         <button
-          v-if="accounts.length"
+          v-if="hasFilters"
           class="button button-outline"
           @click="resetFilters"
         >
@@ -331,7 +340,7 @@ onUnmounted(() => {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="account in filteredAccounts" :key="account.id">
+            <tr v-for="account in accounts" :key="account.id">
               <td>
                 <div class="system-cell">
                   <span class="system-avatar">{{
@@ -437,17 +446,29 @@ onUnmounted(() => {
           </tbody>
         </table>
       </div>
-      <footer class="table-footer">
-        <span aria-live="polite">{{
-          loading
-            ? '正在获取数据…'
-            : error
-              ? '加载失败'
-              : `${filteredAccounts.length}/${accounts.length}`
-        }}</span
-        ><span v-if="lastUpdated && !error && !loading" class="sync-time"
-          ><span></span>更新于 {{ lastUpdated }}</span
-        >
+      <footer class="table-footer account-pagination">
+        <div class="pagination-summary">
+          <span aria-live="polite">{{
+            loading ? '正在获取数据…' : error ? '加载失败'
+              : `共 ${total} 条，显示 ${firstRecord}–${total ? firstRecord + accounts.length - 1 : 0} 条`
+          }}</span>
+          <span v-if="lastUpdated && !error && !loading" class="sync-time">
+            <span></span>更新于 {{ lastUpdated }}
+          </span>
+        </div>
+        <nav class="pagination-controls" aria-label="账号分页">
+          <label for="account-page-size">每页</label>
+          <select id="account-page-size" v-model.number="pageSize">
+            <option :value="5">5 条</option>
+            <option :value="10">10 条</option>
+            <option :value="50">50 条</option>
+          </select>
+          <button class="button button-outline" :disabled="loading || !!error || page <= 1"
+            @click="changePage(page - 1)">上一页</button>
+          <span class="page-number" aria-live="polite">{{ loading || error ? '—' : `${page} / ${totalPages}` }}</span>
+          <button class="button button-outline" :disabled="loading || !!error || page >= totalPages"
+            @click="changePage(page + 1)">下一页</button>
+        </nav>
       </footer>
     </section>
     <footer class="page-footer">
@@ -503,5 +524,17 @@ tr:hover td.account-actions-cell {
 }
 .account-delete-button:hover:not(:disabled) {
   background: #fff2ef;
+}
+
+/* 小屏幕允许分页控件换行，条数选择与翻页操作始终留在表格外。 */
+.account-pagination { flex-wrap: wrap; gap: 16px; }
+.pagination-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.pagination-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.pagination-controls select { border: 1px solid #dce4df; border-radius: 7px; padding: 7px; background: white; color: inherit; font: inherit; }
+.pagination-controls .button { min-height: 34px; padding: 6px 10px; }
+.page-number { min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
+@media (max-width: 600px) {
+  .account-pagination { align-items: flex-start; }
+  .pagination-controls { width: 100%; gap: 6px; }
 }
 </style>
