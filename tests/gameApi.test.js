@@ -51,3 +51,15 @@ test('new games isolate leaderboard variants and submit actions without trusted 
   assert.deepEqual(JSON.parse(calls[1].options.body), { actions: ['O40', 'F3'] })
   assert.equal(calls[2].url, '/api/arcade/mines/leaderboard?variant=hard')
 })
+
+test('Sokoban uses the same cumulative leaderboard across all selected levels', async (t) => {
+  const urls = []
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    urls.push(url)
+    return new Response(JSON.stringify({ code: 0, data: { entries: [], myBest: 0 } }))
+  })
+  await getArcadeLeaderboard('sokoban', '1')
+  await getArcadeLeaderboard('sokoban', '5')
+  await getArcadeLeaderboard('sokoban')
+  assert.deepEqual(urls, Array(3).fill('/api/arcade/sokoban/leaderboard'))
+})

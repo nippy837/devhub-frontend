@@ -31,4 +31,4 @@ export const finishRankedGame = (id, moves) => gameRequest(`/snake/games/${encod
 export const getLeaderboard = () => gameRequest('/snake/leaderboard')
 export const startArcadeGame = (kind, variant) => gameRequest(`/arcade/${encodeURIComponent(kind)}/games`, { method: 'POST', body: { variant } })
 export const finishArcadeGame = (kind, id, actions) => gameRequest(`/arcade/${encodeURIComponent(kind)}/games/${encodeURIComponent(id)}/finish`, { method: 'POST', body: { actions } })
-export const getArcadeLeaderboard = (kind, variant) => gameRequest(`/arcade/${encodeURIComponent(kind)}/leaderboard?${new URLSearchParams({ variant })}`)
+export const getArcadeLeaderboard = (kind, variant) => gameRequest(`/arcade/${encodeURIComponent(kind)}/leaderboard${kind === 'sokoban' ? '' : `?${new URLSearchParams({ variant })}`}`)

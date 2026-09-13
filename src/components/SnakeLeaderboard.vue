@@ -9,10 +9,10 @@ const props = defineProps({
   variant: { type: String, default: 'classic' },
   title: { type: String, default: '贪吃蛇' },
 })
-const metricLabel = () => props.kind === 'sokoban' ? '我的最少步数' : props.kind === 'mines' ? '我的最快用时' : '我的最高分'
+const metricLabel = () => props.kind === 'sokoban' ? '我的通关数' : props.kind === 'mines' ? '我的最快用时' : '我的最高分'
 function formatScore(value) {
   if (value == null) return '—'
-  return props.kind === 'mines' ? `${(value / 1000).toFixed(2)} 秒` : props.kind === 'sokoban' ? `${value} 步` : value
+  return props.kind === 'mines' ? `${(value / 1000).toFixed(2)} 秒` : props.kind === 'sokoban' ? `${value} 关` : value
 }
 
 const emit = defineEmits(['best'])
@@ -37,7 +37,7 @@ async function refresh() {
   } finally { if (requestVersion === version) loading.value = false }
 }
 onMounted(refresh)
-watch(() => [auth.user?.id, props.kind, props.variant], () => { entries.value = []; myBest.value = null; refresh() })
+watch(() => [auth.user?.id, props.kind, props.kind === 'sokoban' ? null : props.variant], () => { entries.value = []; myBest.value = null; refresh() })
 defineExpose({ refresh })
 </script>
 
@@ -59,7 +59,7 @@ defineExpose({ refresh })
         <strong>{{ formatScore(entry.score) }}</strong>
       </li>
     </ol>
-    <p class="ranking-rule">{{ kind === 'sokoban' ? '本关通关步数越少越靠前，每人保留最佳成绩。' : kind === 'mines' ? '本难度通关用时越短越靠前，每人保留最佳成绩。' : kind === 'snake' ? '统一中速，仅统计中速最高分；同分按注册顺序排列。' : '每人显示最高分，同分按注册顺序排列。' }}</p>
+    <p class="ranking-rule">{{ kind === 'sokoban' ? '累计通关越多越靠前，同一关只计一次；通关数相同按注册顺序排列。' : kind === 'mines' ? '本难度通关用时越短越靠前，每人保留最佳成绩。' : kind === 'snake' ? '统一中速，仅统计中速最高分；同分按注册顺序排列。' : '每人显示最高分，同分按注册顺序排列。' }}</p>
   </section>
 </template>
 

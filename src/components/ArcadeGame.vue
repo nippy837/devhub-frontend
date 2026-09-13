@@ -152,7 +152,7 @@ onUnmounted(cleanup)
             <template v-if="kind === 'sokoban'"><option v-for="level in levels" :key="level.id" :value="level.id">第 {{ level.id }} 关 · {{ level.name }}</option></template>
             <template v-else><option v-for="(mode, key) in MINE_MODES" :key="key" :value="key">{{ mode.label }} · {{ mode.mines }} 雷</option></template>
           </select>
-          <p>{{ kind === 'sokoban' ? '每关独立排行，通关步数越少越好。' : '各难度独立排行，通关用时越短越好。' }}</p>
+          <p>{{ kind === 'sokoban' ? '所有关卡共用排行榜，累计通关数量越多越靠前。' : '各难度独立排行，通关用时越短越好。' }}</p>
         </section>
         <section class="arcade-guide"><h2>怎么玩</h2><p>{{ info.instructions }}</p><p v-if="kind === 'mines'">从点击开始到通关持续计时，暂停或切换页面也计时。大棋盘可左右滑动查看。</p><p v-else>空格键开始或暂停，Esc 暂停。</p></section>
       </aside>
