@@ -26,7 +26,7 @@ export async function gameRequest(path, { method = 'GET', body } = {}) {
   } finally { clearTimeout(timeout) }
 }
 
-export const startRankedGame = (difficulty) => gameRequest('/snake/games', { method: 'POST', body: { difficulty } })
+export const startRankedGame = () => gameRequest('/snake/games', { method: 'POST', body: { difficulty: 'normal' } })
 export const finishRankedGame = (id, moves) => gameRequest(`/snake/games/${encodeURIComponent(id)}/finish`, { method: 'POST', body: { moves } })
 export const getLeaderboard = () => gameRequest('/snake/leaderboard')
 export const startArcadeGame = (kind, variant) => gameRequest(`/arcade/${encodeURIComponent(kind)}/games`, { method: 'POST', body: { variant } })

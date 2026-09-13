@@ -2,7 +2,7 @@ export const BOARD_SIZE = 20
 export const FOOD_COUNT = 8
 export const POINTS_PER_FOOD = 20
 export const MAX_TICKS = 50000
-export const SPEEDS = { easy: 200, normal: 140, hard: 90 }
+export const TICK_MS = 140
 export const DIRECTION_CODES = { up: 'U', down: 'D', left: 'L', right: 'R' }
 
 // 与后端使用相同的伪随机序列，服务端可以复算整局得分。

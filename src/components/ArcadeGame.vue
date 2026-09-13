@@ -5,6 +5,7 @@ import { useArcadeRound } from '../composables/useArcadeRound.js'
 import { levels, MINE_MODES } from '../utils/arcadeGames.js'
 import SnakeLeaderboard from './SnakeLeaderboard.vue'
 import AppIcon from './AppIcon.vue'
+import GameSprite from './GameSprite.vue'
 
 const props = defineProps({ kind: { type: String, required: true } })
 const metadata = {
@@ -58,14 +59,10 @@ function pointerUp(event) {
 function mineLabel(cell) {
   const location = `第 ${Math.floor(cell / game.value.size) + 1} 行第 ${cell % game.value.size + 1} 列`
   if (game.value.exploded === cell) return `${location}，踩中地雷`
+  if (phase.value === 'over' && game.value.mines.includes(cell)) return `${location}，地雷`
   if (game.value.revealed.includes(cell)) return `${location}，周围 ${game.value.counts[cell]} 颗地雷`
   if (game.value.flags.includes(cell)) return `${location}，已插旗`
   return `${location}，未翻开`
-}
-function mineSymbol(cell) {
-  if (phase.value === 'over' && game.value.mines.includes(cell)) return '✹'
-  if (game.value.flags.includes(cell)) return '⚑'
-  return game.value.revealed.includes(cell) ? game.value.counts[cell] || '' : ''
 }
 function cleanup() { active = false; touchStart = null; window.removeEventListener('keydown', keyboard) }
 onActivated(() => { active = true; window.addEventListener('keydown', keyboard); leaderboard.value?.refresh() })
@@ -99,7 +96,7 @@ onUnmounted(cleanup)
 
         <div v-if="kind === 'mines'" class="mine-mode" role="group" aria-label="扫雷操作模式">
           <button type="button" :class="{ selected: !flagMode }" :aria-pressed="!flagMode" @click="flagMode = false">翻开格子</button>
-          <button type="button" :class="{ selected: flagMode }" :aria-pressed="flagMode" @click="flagMode = true">⚑ 插旗 / 取消</button>
+          <button type="button" :class="{ selected: flagMode }" :aria-pressed="flagMode" @click="flagMode = true"><GameSprite name="flag" />插旗 / 取消</button>
         </div>
         <div ref="board" class="arcade-board" :class="[`board-${kind}`, { 'board-paused': phase === 'paused' }]" tabindex="0" :aria-label="`${info.title}棋盘`" @pointerdown="pointerDown" @pointerup="pointerUp" @pointercancel="touchStart = null">
           <div v-if="kind === '2048'" class="tiles-2048" role="grid" aria-label="2048 数字方格">
@@ -107,14 +104,18 @@ onUnmounted(cleanup)
           </div>
           <div v-else-if="kind === 'sokoban'" class="sokoban-grid" :style="{ '--columns': game.width }" role="img" :aria-label="`推箱子棋盘，已归位 ${completedBoxes} 个箱子，共 ${game.boxes.length} 个`">
             <div v-for="(_, cell) in game.width * game.height" :key="cell" class="warehouse-cell" :class="{ wall: game.walls.includes(cell), goal: game.goals.includes(cell) }">
-              <span v-if="game.player === cell" class="warehouse-player" aria-hidden="true"><AppIcon name="player" :size="24" /></span>
-              <span v-else-if="game.boxes.includes(cell)" class="warehouse-box" :class="{ 'on-goal': game.goals.includes(cell) }" aria-hidden="true">{{ game.goals.includes(cell) ? '✓' : '×' }}</span>
+              <span v-if="game.player === cell" class="warehouse-player" aria-hidden="true"><GameSprite name="worker" /></span>
+              <span v-else-if="game.boxes.includes(cell)" class="warehouse-box" :class="{ 'on-goal': game.goals.includes(cell) }" aria-hidden="true"><GameSprite name="crate" :complete="game.goals.includes(cell)" /></span>
               <span v-else-if="game.goals.includes(cell)" class="warehouse-goal" aria-hidden="true"></span>
             </div>
           </div>
           <div v-else class="mine-scroll">
             <div class="mine-grid" :style="{ '--columns': game.size }" role="group" aria-label="扫雷方格">
-              <button v-for="cell in mineCells" :key="cell" type="button" class="mine-cell" :class="[{ revealed: game.revealed.includes(cell), flagged: game.flags.includes(cell), exploded: game.exploded === cell }, `near-${game.counts[cell] || 0}`]" :disabled="!playing" :aria-label="mineLabel(cell)" @click="act(`${flagMode ? 'F' : 'O'}${cell}`)" @contextmenu.prevent="act(`F${cell}`)">{{ mineSymbol(cell) }}</button>
+              <button v-for="cell in mineCells" :key="cell" type="button" class="mine-cell" :class="[{ revealed: game.revealed.includes(cell), flagged: game.flags.includes(cell), exploded: game.exploded === cell }, `near-${game.counts[cell] || 0}`]" :disabled="!playing" :aria-label="mineLabel(cell)" @click="act(`${flagMode ? 'F' : 'O'}${cell}`)" @contextmenu.prevent="act(`F${cell}`)">
+                <GameSprite v-if="phase === 'over' && game.mines.includes(cell)" name="mine" />
+                <GameSprite v-else-if="game.flags.includes(cell)" name="flag" />
+                <span v-else>{{ game.revealed.includes(cell) ? game.counts[cell] || '' : '' }}</span>
+              </button>
             </div>
           </div>
           <div v-if="['ready', 'paused'].includes(phase)" class="arcade-overlay">
@@ -178,20 +179,23 @@ onUnmounted(cleanup)
 .tile-2 { background: #f1f3e9; }.tile-4 { background: #e9edcf; }.tile-8 { background: #edd79d; }.tile-16 { background: #edc181; }.tile-32 { background: #e6a16c; color: #fff; }.tile-64 { background: #d48052; color: #fff; }.tile-128 { background: #a2ba77; color: #fff; }.tile-256 { background: #7fa464; color: #fff; }.tile-512 { background: #578651; color: #fff; }.tile-1024 { background: #356d4f; color: #fff; font-size: clamp(20px, 3vw, 34px); }.tile-2048 { background: #176b51; color: #fff; font-size: clamp(20px, 3vw, 34px); }
 .sokoban-grid { display: grid; grid-template-columns: repeat(var(--columns), minmax(0, 1fr)); gap: 3px; padding: 8px; border-radius: 12px; background: #e4ede2; }
 .warehouse-cell { aspect-ratio: 1; display: grid; place-items: center; border-radius: 4px; background: #f4f7ef; }
-.warehouse-cell.wall { background: #5d7662; box-shadow: inset 0 -4px #49634f; }
-.warehouse-player { display: grid; place-items: center; width: 72%; height: 72%; border-radius: 50%; background: #176b51; color: white; }
-.warehouse-box { display: grid; place-items: center; width: 80%; height: 80%; border: 3px solid #ad7c43; border-radius: 5px; background: #d5a968; color: #9a6934; font-size: 28px; font-weight: 700; line-height: 1; }
-.warehouse-box.on-goal { background: #8fb784; border-color: #638b5c; color: #fff; font-size: 23px; }
+.warehouse-cell.wall { background: linear-gradient(135deg, #819783, #647d69); border: 1px solid #617a66; box-shadow: inset 0 2px #9aac98, inset 0 -4px #506b56; }
+.warehouse-player { width: 94%; height: 94%; }
+.warehouse-box { width: 96%; height: 96%; }
+.warehouse-cell:has(.warehouse-box.on-goal) { background: #e4efdd; }
 .warehouse-goal { width: 28%; height: 28%; border-radius: 50%; background: #b7cf88; box-shadow: 0 0 0 5px #e3edcc; }
 .mine-mode { display: flex; gap: 10px; margin-bottom: 16px; }
-.mine-mode button { flex: 1; padding: 10px; border: 1px solid #dce5df; border-radius: 7px; background: #fff; color: #617568; }
+.mine-mode button { display: flex; align-items: center; justify-content: center; gap: 8px; flex: 1; padding: 10px; border: 1px solid #dce5df; border-radius: 7px; background: #fff; color: #617568; }
+.mine-mode .game-sprite { width: 25px; height: 25px; flex-shrink: 0; }
 .mine-mode button.selected { background: #edf5ee; border-color: #84bda7; color: #176b51; }
 .mine-scroll { overflow-x: auto; border-radius: 10px; background: #e5eee5; padding: 6px; }
-.mine-grid { display: grid; grid-template-columns: repeat(var(--columns), minmax(28px, 1fr)); gap: 3px; min-width: calc(var(--columns) * 31px - 3px); }
-.mine-cell { min-width: 0; aspect-ratio: 1; padding: 0; border: 1px solid #b8cbbb; border-bottom-width: 3px; border-radius: 4px; color: #3c7051; background: #d3e3d1; font-weight: 700; font-size: clamp(13px, 2vw, 19px); }
+.mine-grid { display: grid; grid-template-columns: repeat(var(--columns), minmax(30px, 1fr)); gap: 3px; min-width: calc(var(--columns) * 33px - 3px); }
+.mine-cell { display: grid; place-items: center; min-width: 0; aspect-ratio: 1; padding: 0; border: 1px solid #b8cbbb; border-bottom-width: 3px; border-radius: 4px; color: #3c7051; background: #d3e3d1; font-weight: 700; font-size: clamp(13px, 2vw, 19px); }
 .mine-cell.revealed { background: #f5f8f2; border: 1px solid #e1e9de; }
 .mine-cell:disabled { cursor: default; opacity: 1; }
-.mine-cell.flagged { color: #c57934; }.mine-cell.exploded { color: white; background: #be5546; }
+.mine-cell .game-sprite { width: 86%; height: 86%; max-width: 44px; max-height: 44px; }
+.mine-cell.flagged { background: #f3e9d6; border-color: #d6c19c; }
+.mine-cell.exploded { background: #f2c5b8; border-color: #cb8371; }
 .mine-cell.near-1 { color: #3262a1; }.mine-cell.near-2 { color: #277349; }.mine-cell.near-3 { color: #b04e42; }.mine-cell.near-4 { color: #74549a; }
 .arcade-overlay { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 12px; background: #f0f6efb8; backdrop-filter: blur(3px); }
 .arcade-overlay-card { display: flex; flex-direction: column; align-items: center; gap: 18px; color: #176b51; }
@@ -212,5 +216,5 @@ onUnmounted(cleanup)
 .arcade-dpad button:disabled { cursor: default; }.arcade-dpad button:active:not(:disabled) { background: #cfe5d7; }
 .move-U { grid-column: 2; }.move-L { grid-column: 1; grid-row: 2; }.move-D { grid-column: 2; grid-row: 2; }.move-R { grid-column: 3; grid-row: 2; }
 @media (max-width: 1100px) { .arcade-layout { grid-template-columns: minmax(0, 1fr); max-width: 680px; }.arcade-aside { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 500px) { .arcade-panel, .arcade-guide { padding: 14px; }.arcade-scorebar { gap: 22px; }.arcade-scorebar strong { font-size: 26px; }.arcade-tag { display: none; }.arcade-aside { grid-template-columns: minmax(0, 1fr); }.tiles-2048 { padding: 7px; gap: 7px; }.warehouse-box { font-size: 23px; border-width: 2px; }.warehouse-box.on-goal { font-size: 19px; }.warehouse-player svg { width: 19px; height: 19px; } }
+@media (max-width: 500px) { .arcade-panel, .arcade-guide { padding: 14px; }.arcade-scorebar { gap: 22px; }.arcade-scorebar strong { font-size: 26px; }.arcade-tag { display: none; }.arcade-aside { grid-template-columns: minmax(0, 1fr); }.tiles-2048 { padding: 7px; gap: 7px; } }
 </style>

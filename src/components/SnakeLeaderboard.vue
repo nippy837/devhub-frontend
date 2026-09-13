@@ -59,7 +59,7 @@ defineExpose({ refresh })
         <strong>{{ formatScore(entry.score) }}</strong>
       </li>
     </ol>
-    <p class="ranking-rule">{{ kind === 'sokoban' ? '本关通关步数越少越靠前，每人保留最佳成绩。' : kind === 'mines' ? '本难度通关用时越短越靠前，每人保留最佳成绩。' : '每人显示最高分，同分按注册顺序排列。' }}</p>
+    <p class="ranking-rule">{{ kind === 'sokoban' ? '本关通关步数越少越靠前，每人保留最佳成绩。' : kind === 'mines' ? '本难度通关用时越短越靠前，每人保留最佳成绩。' : kind === 'snake' ? '统一中速，仅统计中速最高分；同分按注册顺序排列。' : '每人显示最高分，同分按注册顺序排列。' }}</p>
   </section>
 </template>
 

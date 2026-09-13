@@ -1,16 +1,14 @@
 <script setup>
 import { computed, nextTick, onActivated, onDeactivated, onUnmounted, ref, watch } from 'vue'
 import AppIcon from './AppIcon.vue'
-import { BOARD_SIZE, DIRECTION_CODES, MAX_TICKS, SPEEDS, canTurn, createGame, seededRandom, stepGame } from '../utils/snakeGame.js'
+import { BOARD_SIZE, DIRECTION_CODES, MAX_TICKS, TICK_MS, canTurn, createGame, seededRandom, stepGame } from '../utils/snakeGame.js'
 import { startRankedGame, finishRankedGame } from '../api/game.js'
 import { auth, openAuth } from '../composables/useAuth.js'
 import SnakeLeaderboard from './SnakeLeaderboard.vue'
 
 const game = ref(createGame())
 const board = ref(null)
-const difficulty = ref('normal')
-const speeds = SPEEDS
-const bestKey = 'devhub.snake.best.v2'
+const bestKey = 'devhub.snake.best.normal.v3'
 const guestBest = ref(readBest())
 const memberBest = ref(0)
 const best = computed(() => auth.user ? memberBest.value : guestBest.value)
@@ -104,7 +102,7 @@ async function start() {
     starting.value = true
     try {
       if (auth.user) {
-        const round = await startRankedGame(difficulty.value)
+        const round = await startRankedGame()
         if (currentGeneration !== generation || !active) return
         gameId = round.id
         random = seededRandom(round.seed)
@@ -121,7 +119,7 @@ async function start() {
   }
   if (!active || auth.dialog || document.hidden) { game.value = { ...game.value, status: 'paused' }; return }
   game.value = { ...game.value, status: 'running' }
-  timer = setInterval(tick, speeds[difficulty.value])
+  timer = setInterval(tick, TICK_MS)
   nextTick(() => board.value?.focus({ preventScroll: true }))
 }
 
@@ -277,16 +275,6 @@ onUnmounted(cleanup)
 
       <aside class="snake-guide" aria-label="游戏设置和玩法">
         <SnakeLeaderboard ref="leaderboard" @best="memberBest = $event" />
-        <section class="snake-guide-card">
-          <h2>选择节奏</h2>
-          <label class="sr-only" for="snake-difficulty">游戏难度</label>
-          <select id="snake-difficulty" v-model="difficulty" :disabled="starting || saving || game.status === 'running' || game.status === 'paused'">
-            <option value="easy">轻松 · 慢速</option>
-            <option value="normal">标准 · 中速</option>
-            <option value="hard">挑战 · 快速</option>
-          </select>
-          <small>开始前可选择，本局内保持不变。</small>
-        </section>
         <section id="snake-instructions" class="snake-guide-card">
           <h2>怎么玩</h2>
           <p>用方向键或 WASD 转向，吃到果实后小蛇会变长。左右、上下边界均可穿越，撞到自身结束游戏，占满棋盘即可获胜。</p>
@@ -332,8 +320,6 @@ onUnmounted(cleanup)
 .snake-guide-card { padding: 24px; }
 .snake-guide-card h2 { font-size: 16px; }
 .snake-guide-card p { color: #748178; line-height: 1.9; margin-top: 10px; }
-.snake-guide-card select { display: block; width: 100%; margin: 18px 0 10px; padding: 11px; color: #426150; background: #f8faf8; border: 1px solid #dce5df; border-radius: 7px; }
-.snake-guide-card select:disabled { opacity: .65; }
 .snake-guide-card small { font-size: 12px; color: #7b887f; line-height: 1.8; }
 .snake-key-hint { display: flex; align-items: center; gap: 12px; color: #748178; font-size: 12px; margin-top: 15px; }
 kbd { min-width: 52px; text-align: center; border: 1px solid #dce5df; border-bottom-width: 3px; border-radius: 5px; padding: 3px 6px; font: inherit; color: #426150; background: #f8faf8; }
