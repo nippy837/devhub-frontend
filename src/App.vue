@@ -1,11 +1,23 @@
 <script setup>
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import AccountList from './components/AccountList.vue'
 import JsonTool from './components/JsonTool.vue'
 import DiffTool from './components/DiffTool.vue'
 import SpeedTool from './components/SpeedTool.vue'
 import AppIcon from './components/AppIcon.vue'
 import SnakeGame from './components/SnakeGame.vue'
+import AuthDialog from './components/AuthDialog.vue'
+import { auth, loadAuth, logout, openAuth } from './composables/useAuth.js'
+
+const logoutError = ref('')
+const loggingOut = ref(false)
+onMounted(loadAuth)
+async function signOut() {
+  loggingOut.value = true
+  logoutError.value = ''
+  try { await logout() } catch (error) { logoutError.value = error.message }
+  finally { loggingOut.value = false }
+}
 
 const pages = [
   {
@@ -110,8 +122,31 @@ watch(
             current.title
           }}</strong>
         </div>
+        <div class="auth-controls">
+          <span v-if="logoutError" role="alert">{{ logoutError }}</span>
+          <template v-if="auth.user">
+            <strong>{{ auth.user.username }}</strong>
+            <button type="button" class="button button-outline" :disabled="loggingOut" @click="signOut">退出登录</button>
+          </template>
+          <template v-else>
+            <button type="button" class="button button-outline" :disabled="!auth.ready" @click="openAuth()">登录</button>
+            <button type="button" class="button button-primary" :disabled="!auth.ready" @click="openAuth('register')">注册</button>
+          </template>
+        </div>
       </header>
       <KeepAlive><component :is="current.component" /></KeepAlive>
     </div>
+    <AuthDialog />
   </div>
 </template>
+
+<style scoped>
+.auth-controls { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
+.auth-controls strong { overflow-wrap: anywhere; }
+.auth-controls > span { color: #a73b2b; font-size: 12px; }
+.auth-controls .button { padding: 7px 13px; }
+@media (max-width: 800px) {
+  .topbar { display: flex; height: auto; min-height: 60px; padding: 12px 16px; justify-content: flex-end; }
+  .breadcrumb { display: none; }
+}
+</style>

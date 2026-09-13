@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { canTurn, createFood, createGame, stepGame } from '../src/utils/snakeGame.js'
+import { canTurn, createFood, createGame, seededRandom, stepGame } from '../src/utils/snakeGame.js'
 
 const runningGame = (overrides = {}) => ({ ...createGame(() => 0), status: 'running', ...overrides })
 
@@ -14,10 +14,11 @@ test('moving preserves length and does not mutate the previous state', () => {
 })
 
 test('eating grows the snake, scores points and puts food in a free cell', () => {
-  const next = stepGame(runningGame({ food: { x: 8, y: 10 } }), 'right', () => 0)
-  assert.equal(next.score, 10)
+  const next = stepGame(runningGame({ foods: [{ x: 8, y: 10 }] }), 'right', () => 0)
+  assert.equal(next.score, 20)
   assert.equal(next.snake.length, 4)
-  assert.ok(!next.snake.some((cell) => cell.x === next.food.x && cell.y === next.food.y))
+  assert.equal(next.foods.length, 8)
+  assert.ok(next.foods.every((food) => !next.snake.some((cell) => cell.x === food.x && cell.y === food.y)))
 })
 
 test('opposite directions are rejected', () => {
@@ -43,8 +44,8 @@ test('crossing each edge wraps to the opposite edge', () => {
 
 test('wrapping can eat fruit or collide with the body on the opposite edge', () => {
   const snake = [{ x: 19, y: 5 }, { x: 18, y: 5 }, { x: 17, y: 5 }]
-  const next = stepGame(runningGame({ snake, food: { x: 0, y: 5 } }))
-  assert.equal(next.score, 10)
+  const next = stepGame(runningGame({ snake, foods: [{ x: 0, y: 5 }] }))
+  assert.equal(next.score, 20)
   assert.equal(next.snake.length, 4)
   assert.deepEqual(next.snake[0], { x: 0, y: 5 })
   const loop = [{ x: 19, y: 5 }, { x: 19, y: 6 }, { x: 0, y: 6 }, { x: 0, y: 5 }, { x: 0, y: 4 }]
@@ -59,10 +60,10 @@ test('eating the last fruit across an edge fills the real 20 by 20 board and win
       if (x !== 0 || y !== 0) snake.push({ x, y })
     }
   }
-  const result = stepGame(runningGame({ snake, score: 3960, food: { x: 0, y: 0 } }))
+  const result = stepGame(runningGame({ snake, score: 7920, foods: [{ x: 0, y: 0 }] }))
   assert.equal(result.status, 'won')
-  assert.equal(result.food, null)
-  assert.equal(result.score, 3970)
+  assert.deepEqual(result.foods, [])
+  assert.equal(result.score, 7940)
   assert.equal(new Set(result.snake.map(({ x, y }) => `${x},${y}`)).size, 400)
   assert.equal(stepGame(result), result)
 })
@@ -75,9 +76,9 @@ test('body collision ends the game, but moving into the departing tail is allowe
 
 test('filling the board wins without trying to spawn another fruit', () => {
   const snake = [{ x: 0, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }]
-  const result = stepGame(runningGame({ snake, food: { x: 1, y: 0 } }), 'right', () => 0, 2)
+  const result = stepGame(runningGame({ snake, foods: [{ x: 1, y: 0 }] }), 'right', () => 0, 2)
   assert.equal(result.status, 'won')
-  assert.equal(result.food, null)
+  assert.deepEqual(result.foods, [])
   assert.equal(result.snake.length, 4)
   assert.equal(createFood(result.snake, 2), null)
 })
@@ -87,4 +88,15 @@ test('ready, paused and finished games do not move', () => {
     const game = runningGame({ status })
     assert.equal(stepGame(game), game)
   }
+})
+
+
+test('eight distinct fruits are maintained and seeded layouts are repeatable', () => {
+  const a = createGame(seededRandom(123456789))
+  const b = createGame(seededRandom(123456789))
+  assert.deepEqual(a, b)
+  assert.equal(a.foods.length, 8)
+  assert.equal(new Set(a.foods.map(({ x, y }) => `${x},${y}`)).size, 8)
+  assert.ok(a.foods.every((food) => !a.snake.some((cell) => cell.x === food.x && cell.y === food.y)))
+  assert.notDeepEqual(a.foods, createGame(seededRandom(987654321)).foods)
 })

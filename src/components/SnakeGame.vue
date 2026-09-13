@@ -1,14 +1,31 @@
 <script setup>
-import { computed, nextTick, onActivated, onDeactivated, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onActivated, onDeactivated, onUnmounted, ref, watch } from 'vue'
 import AppIcon from './AppIcon.vue'
-import { BOARD_SIZE, canTurn, createGame, stepGame } from '../utils/snakeGame.js'
+import { BOARD_SIZE, DIRECTION_CODES, MAX_TICKS, SPEEDS, canTurn, createGame, seededRandom, stepGame } from '../utils/snakeGame.js'
+import { startRankedGame, finishRankedGame } from '../api/game.js'
+import { auth, openAuth } from '../composables/useAuth.js'
+import SnakeLeaderboard from './SnakeLeaderboard.vue'
 
 const game = ref(createGame())
 const board = ref(null)
 const difficulty = ref('normal')
-const speeds = { easy: 200, normal: 140, hard: 90 }
-const bestKey = 'devhub.snake.best'
-const best = ref(readBest())
+const speeds = SPEEDS
+const bestKey = 'devhub.snake.best.v2'
+const guestBest = ref(readBest())
+const memberBest = ref(0)
+const best = computed(() => auth.user ? memberBest.value : guestBest.value)
+const leaderboard = ref(null)
+const starting = ref(false)
+const saving = ref(false)
+const saveError = ref('')
+const startError = ref('')
+const saveMessage = ref('')
+const pending = ref(null)
+let random = Math.random
+let gameId = null
+let moves = ''
+let generation = 0
+let active = true
 let timer = null
 let turns = []
 const running = computed(() => game.value.status === 'running')
@@ -40,20 +57,69 @@ function pause() {
 }
 
 function tick() {
-  game.value = stepGame(game.value, turns.shift() || game.value.direction)
-  if (game.value.score > best.value) {
-    best.value = game.value.score
-    try { localStorage.setItem(bestKey, String(best.value)) } catch { /* Play still works without storage. */ }
+  const direction = turns.shift() || game.value.direction
+  moves += DIRECTION_CODES[direction]
+  game.value = stepGame(game.value, direction, random)
+  if (!auth.user && game.value.score > guestBest.value) {
+    guestBest.value = game.value.score
+    try { localStorage.setItem(bestKey, String(guestBest.value)) } catch { /* Storage is optional. */ }
   }
-  if (!running.value) stopTimer()
+  if (!running.value || moves.length >= MAX_TICKS) endRound()
 }
 
-function start() {
+async function saveScore() {
+  if (!pending.value || saving.value) return
+  const submission = pending.value
+  saving.value = true
+  saveError.value = ''
+  try {
+    const result = await finishRankedGame(submission.id, submission.moves)
+    if (pending.value !== submission) return
+    memberBest.value = Math.max(memberBest.value, result.score)
+    saveMessage.value = `本局 ${result.score} 分已保存`
+    pending.value = null
+    leaderboard.value?.refresh()
+  } catch (error) {
+    if (pending.value === submission) saveError.value = error.message
+  } finally { saving.value = false }
+}
+
+async function endRound() {
   stopTimer()
-  if (['ready', 'over', 'won'].includes(game.value.status)) {
-    if (game.value.status !== 'ready') game.value = createGame()
-    turns = []
+  if (['running', 'paused'].includes(game.value.status)) game.value = { ...game.value, status: 'over' }
+  if (gameId && !pending.value) {
+    pending.value = { id: gameId, moves }
+    gameId = null
+    await saveScore()
   }
+}
+
+async function start() {
+  if (starting.value || saving.value || !auth.ready) return
+  if (pending.value) { saveError.value = '请先重试保存，或放弃本局成绩后再开始。'; return }
+  stopTimer()
+  startError.value = ''
+  const currentGeneration = generation
+  if (['ready', 'over', 'won'].includes(game.value.status)) {
+    starting.value = true
+    try {
+      if (auth.user) {
+        const round = await startRankedGame(difficulty.value)
+        if (currentGeneration !== generation || !active) return
+        gameId = round.id
+        random = seededRandom(round.seed)
+      } else {
+        gameId = null
+        random = Math.random
+      }
+      game.value = createGame(random)
+      moves = ''
+      turns = []
+      saveMessage.value = ''
+    } catch (error) { startError.value = error.message; return }
+    finally { starting.value = false }
+  }
+  if (!active || auth.dialog || document.hidden) { game.value = { ...game.value, status: 'paused' }; return }
   game.value = { ...game.value, status: 'running' }
   timer = setInterval(tick, speeds[difficulty.value])
   nextTick(() => board.value?.focus({ preventScroll: true }))
@@ -64,10 +130,34 @@ function toggle() {
   else start()
 }
 
-function restart() {
+async function restart() {
+  if (starting.value || saving.value) return
+  if (['running', 'paused'].includes(game.value.status)) await endRound()
+  if (pending.value) return
   game.value = createGame()
   start()
 }
+
+function discardScore() {
+  if (saving.value) return
+  pending.value = null
+  saveError.value = ''
+  saveMessage.value = ''
+}
+
+watch(() => auth.dialog, (open) => { if (open) pause() })
+watch(() => auth.user?.id, () => {
+  generation++
+  stopTimer()
+  game.value = createGame()
+  turns = []
+  gameId = null
+  pending.value = null
+  saveError.value = ''
+  saveMessage.value = ''
+  startError.value = ''
+  memberBest.value = 0
+})
 
 function turn(direction) {
   if (!running.value || turns.length >= 2) return
@@ -94,6 +184,8 @@ function onVisibilityChange() {
 }
 
 function cleanup() {
+  active = false
+  generation++
   pause()
   window.removeEventListener('keydown', onKeydown)
   window.removeEventListener('blur', pause)
@@ -101,6 +193,8 @@ function cleanup() {
 }
 
 onActivated(() => {
+  active = true
+  leaderboard.value?.refresh()
   window.addEventListener('keydown', onKeydown)
   window.addEventListener('blur', pause)
   document.addEventListener('visibilitychange', onVisibilityChange)
@@ -123,7 +217,7 @@ onUnmounted(cleanup)
       <section class="snake-arena" aria-label="贪吃蛇游戏">
         <div class="snake-scorebar">
           <div><span>本局得分</span><strong>{{ game.score.toString().padStart(2, '0') }}</strong></div>
-          <div><span>最高纪录</span><strong>{{ best.toString().padStart(2, '0') }}</strong></div>
+          <div><span>{{ auth.user ? '我的最高分' : '游客纪录' }}</span><strong>{{ best.toString().padStart(2, '0') }}</strong></div>
           <span class="snake-status" role="status"><i :class="{ running }"></i>{{ statusText }}</span>
         </div>
         <div ref="board" class="snake-board" tabindex="0" role="group" aria-label="贪吃蛇棋盘，方向键或 WASD 控制方向，空格开始或暂停" aria-describedby="snake-instructions">
@@ -135,9 +229,9 @@ onUnmounted(cleanup)
             </defs>
             <rect width="400" height="400" fill="#f0f6ef" />
             <rect width="400" height="400" fill="url(#snake-grid)" />
-            <g v-if="game.food">
-              <circle :cx="game.food.x * 20 + 10" :cy="game.food.y * 20 + 11" r="7" fill="#e69b48" />
-              <path :d="`M${game.food.x * 20 + 10} ${game.food.y * 20 + 5}q0-5 5-5`" fill="none" stroke="#648459" stroke-width="2" />
+            <g v-for="food in game.foods" :key="`${food.x},${food.y}`">
+              <circle :cx="food.x * 20 + 10" :cy="food.y * 20 + 11" r="7" fill="#e69b48" />
+              <path :d="`M${food.x * 20 + 10} ${food.y * 20 + 5}q0-5 5-5`" fill="none" stroke="#648459" stroke-width="2" />
             </g>
             <rect v-for="(cell, index) in game.snake" :key="`${cell.x},${cell.y}`" :x="cell.x * 20 + 1" :y="cell.y * 20 + 1" width="18" height="18" :rx="index === 0 ? 6 : 4" :fill="index === 0 ? '#164f3d' : '#4b9470'" />
             <g :transform="`translate(${game.snake[0].x * 20 + 10} ${game.snake[0].y * 20 + 10}) rotate(${{ right: 0, down: 90, left: 180, up: 270 }[game.direction]})`" fill="white">
@@ -149,15 +243,28 @@ onUnmounted(cleanup)
               <span class="snake-emblem"><AppIcon name="snake" :size="30" /></span>
               <h2>{{ statusText }}</h2>
               <p v-if="overlayDescription">{{ overlayDescription }}</p>
-              <button type="button" class="button button-primary" @click="start">{{ actionText }} <span aria-hidden="true">→</span></button>
+              <button type="button" class="button button-primary" :disabled="starting || saving || !auth.ready || !!pending" @click="start">{{ starting ? '正在开始…' : actionText }} <span aria-hidden="true">→</span></button>
             </div>
           </div>
         </div>
         <div class="snake-toolbar">
-          <span>每颗果实 +10 分</span>
+          <span>8 颗果实 · 每颗 +20 分</span>
           <div>
-            <button type="button" class="button button-outline" @click="toggle">{{ actionText }}</button>
-            <button type="button" class="button button-outline" @click="restart"><AppIcon name="refresh" :size="16" />重新开始</button>
+            <button type="button" class="button button-outline" :disabled="starting || saving || !auth.ready || !!pending" @click="toggle">{{ actionText }}</button>
+            <button type="button" class="button button-outline" :disabled="starting || saving || !auth.ready || !!pending" @click="restart"><AppIcon name="refresh" :size="16" />重新开始</button>
+          </div>
+        </div>
+        <div class="snake-savebar">
+          <button v-if="auth.user && ['running', 'paused'].includes(game.status)" type="button" class="button button-outline" :disabled="saving" @click="endRound">结束并记分</button>
+          <span v-if="saving" role="status">正在保存成绩…</span>
+          <span v-else-if="saveMessage" role="status">{{ saveMessage }}</span>
+          <span v-else-if="!auth.user"><button type="button" @click="openAuth()">登录</button> 后新开的对局可计入排行榜</span>
+          <p v-if="startError" class="snake-request-error" role="alert">{{ startError }} <button type="button" @click="openAuth()">登录</button></p>
+          <div v-if="saveError" class="snake-request-error" role="alert">
+            {{ saveError }}
+            <button type="button" :disabled="saving" @click="saveScore">重试保存</button>
+            <button type="button" :disabled="saving" @click="openAuth()">重新登录</button>
+            <button type="button" :disabled="saving" @click="discardScore">放弃本局成绩</button>
           </div>
         </div>
         <div class="snake-mobile-controls">
@@ -169,10 +276,11 @@ onUnmounted(cleanup)
       </section>
 
       <aside class="snake-guide" aria-label="游戏设置和玩法">
+        <SnakeLeaderboard ref="leaderboard" @best="memberBest = $event" />
         <section class="snake-guide-card">
           <h2>选择节奏</h2>
           <label class="sr-only" for="snake-difficulty">游戏难度</label>
-          <select id="snake-difficulty" v-model="difficulty" :disabled="game.status === 'running' || game.status === 'paused'">
+          <select id="snake-difficulty" v-model="difficulty" :disabled="starting || saving || game.status === 'running' || game.status === 'paused'">
             <option value="easy">轻松 · 慢速</option>
             <option value="normal">标准 · 中速</option>
             <option value="hard">挑战 · 快速</option>
@@ -238,6 +346,9 @@ kbd { min-width: 52px; text-align: center; border: 1px solid #dce5df; border-bot
 .direction-down { grid-column: 2; grid-row: 2; }
 .direction-right { grid-column: 3; grid-row: 2; }
 .snake-touch-hint { display: block; text-align: center; }
+.snake-savebar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; font-size: 12px; color: #748178; }
+.snake-savebar button:not(.button) { border: 0; background: none; color: var(--green); padding: 3px 5px; }
+.snake-request-error { flex-basis: 100%; color: #a73b2b; }
 .snake-mobile-controls { display: none; color: #7b887f; }
 @media (max-width: 1100px) {
   .snake-layout { grid-template-columns: minmax(0, 1fr); max-width: 680px; }
