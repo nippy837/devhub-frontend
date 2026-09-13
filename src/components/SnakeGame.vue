@@ -76,7 +76,7 @@ async function saveScore() {
     memberBest.value = Math.max(memberBest.value, result.score)
     saveMessage.value = `本局 ${result.score} 分已保存`
     pending.value = null
-    leaderboard.value?.refresh()
+    await leaderboard.value?.refresh()
   } catch (error) {
     if (pending.value === submission) saveError.value = error.message
   } finally { saving.value = false }
@@ -192,7 +192,6 @@ function cleanup() {
 
 onActivated(() => {
   active = true
-  leaderboard.value?.refresh()
   window.addEventListener('keydown', onKeydown)
   window.addEventListener('blur', pause)
   document.addEventListener('visibilitychange', onVisibilityChange)

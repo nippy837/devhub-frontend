@@ -16,7 +16,8 @@ const metadata = {
 const info = metadata[props.kind]
 const variant = ref(props.kind === 'sokoban' ? '1' : props.kind === 'mines' ? 'easy' : 'classic')
 const leaderboard = ref(null), board = ref(null), flagMode = ref(false)
-const { game, phase, elapsed, starting, saving, error, message, pending, locked, start, restart, pause, finish, act, save, discard } = useArcadeRound(props.kind, variant, () => leaderboard.value?.refresh())
+const { game, phase, elapsed, lastRound, starting, saving, error, message, pending, locked, start, restart, pause, finish, act, save, discard } = useArcadeRound(props.kind, variant, () => leaderboard.value?.refresh())
+const nextLevel = computed(() => props.kind === 'sokoban' ? levels[levels.findIndex((level) => level.id === variant.value) + 1] : null)
 const playing = computed(() => phase.value === 'running')
 const statusText = computed(() => ({ ready: '准备开始', running: '进行中', paused: '已暂停', won: '挑战成功', over: '本局结束' })[phase.value])
 const primaryLabel = computed(() => starting.value ? '正在开始…' : phase.value === 'ready' ? '开始游戏' : phase.value === 'paused' ? '继续游戏' : '再玩一次')
@@ -31,6 +32,12 @@ async function begin() {
   await start()
   await nextTick()
   if (phase.value === 'running') board.value?.focus({ preventScroll: true })
+}
+async function advanceLevel() {
+  if (phase.value !== 'won' || !nextLevel.value || locked.value || !auth.ready) return
+  variant.value = nextLevel.value.id
+  await nextTick()
+  await begin()
 }
 function move(code) { act(code); board.value?.focus({ preventScroll: true }) }
 function keyboard(event) {
@@ -65,7 +72,7 @@ function mineLabel(cell) {
   return `${location}，未翻开`
 }
 function cleanup() { active = false; touchStart = null; window.removeEventListener('keydown', keyboard) }
-onActivated(() => { active = true; window.addEventListener('keydown', keyboard); leaderboard.value?.refresh() })
+onActivated(() => { active = true; window.addEventListener('keydown', keyboard) })
 onDeactivated(cleanup)
 onUnmounted(cleanup)
 </script>
@@ -126,6 +133,8 @@ onUnmounted(cleanup)
         <div v-if="phase === 'won' || phase === 'over'" class="arcade-result" role="status">
           <strong>{{ phase === 'won' ? kind === '2048' ? '合成 2048，挑战成功！' : '恭喜通关！' : kind === 'mines' && game.exploded >= 0 ? '踩到地雷了，再试一次吧。' : '本局结束' }}</strong>
           <span>{{ kind === '2048' ? `本局 ${game.score} 分` : kind === 'sokoban' ? `移动 ${game.steps} 步` : `用时 ${(elapsed / 1000).toFixed(2)} 秒` }}</span>
+          <button v-if="kind === 'sokoban' && phase === 'won' && nextLevel" type="button" class="button button-primary next-level" :disabled="locked || !auth.ready" @click="advanceLevel">下一关<AppIcon name="chevron" :size="16" /></button>
+          <span v-else-if="kind === 'sokoban' && phase === 'won'">已完成最后一关</span>
         </div>
         <div class="arcade-actions">
           <button v-if="playing" type="button" class="button button-outline" @click="pause">暂停</button>
@@ -144,7 +153,7 @@ onUnmounted(cleanup)
         </div>
       </section>
       <aside class="arcade-aside">
-        <SnakeLeaderboard ref="leaderboard" :kind="kind" :variant="variant" :title="info.title" />
+        <SnakeLeaderboard ref="leaderboard" :kind="kind" :variant="variant" :title="info.title" :last-round="lastRound" />
         <section v-if="kind !== '2048'" class="arcade-guide">
           <h2>{{ kind === 'sokoban' ? '选择关卡' : '选择难度' }}</h2>
           <label class="sr-only" :for="`${kind}-variant`">{{ kind === 'sokoban' ? '关卡' : '难度' }}</label>
@@ -206,6 +215,7 @@ onUnmounted(cleanup)
 .arcade-feedback button { border: 0; background: transparent; color: var(--green); padding: 4px; }
 .arcade-error { color: #a73b2b; }
 .arcade-result { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; padding: 14px 16px; background: #edf5ee; border-radius: 8px; margin-top: 18px; color: #176b51; }
+.next-level { margin-left: auto; padding: 8px 14px; }
 .arcade-result span { font-size: 13px; }
 .arcade-aside { display: grid; gap: 20px; min-width: 0; }
 .arcade-guide h2 { font-size: 16px; }

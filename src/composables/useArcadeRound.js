@@ -8,7 +8,7 @@ export function useArcadeRound(kind, variant, onSaved) {
   const phase = ref('ready')
   const starting = ref(false), saving = ref(false)
   const error = ref(''), message = ref(''), pending = ref(null)
-  const elapsed = ref(0)
+  const elapsed = ref(0), lastRound = ref(null)
   let random, gameId = null, actions = [], startedAt = 0, version = 0, active = true, clock = null
   const locked = computed(() => starting.value || saving.value || Boolean(pending.value))
 
@@ -56,6 +56,7 @@ export function useArcadeRound(kind, variant, onSaved) {
   async function save() {
     if (!pending.value || saving.value) return
     const submission = pending.value
+    const generation = version
     saving.value = true
     error.value = ''
     try {
@@ -63,16 +64,25 @@ export function useArcadeRound(kind, variant, onSaved) {
       if (pending.value !== submission) return
       pending.value = null
       const ranked = kind === '2048' ? result.score > 0 : result.outcome === 'won'
-      if (kind === 'mines' && result.outcome === 'won') elapsed.value = result.score
-      message.value = ranked ? '成绩已保存，排行榜已更新' : '本局已结束，未产生排行成绩'
-      onSaved()
+      if (kind === 'mines') {
+        elapsed.value = result.elapsedMs ?? (result.outcome === 'won' ? result.score : elapsed.value)
+        lastRound.value = { variant: variant.value, elapsedMs: elapsed.value, outcome: result.outcome }
+      }
+      message.value = ranked ? '成绩已保存' : kind === '2048' ? '本局已结束，未产生排行成绩' : '本局已结束，未通关不参与排名'
+      const refreshed = await onSaved()
+      if (refreshed && generation === version && kind === 'mines') lastRound.value = null
     } catch (failure) { if (pending.value === submission) error.value = failure.message }
     finally { saving.value = false }
   }
 
   async function finish() {
+    if (!['running', 'paused'].includes(phase.value) || locked.value) return
     updateClock()
     phase.value = game.value.status === 'won' ? 'won' : 'over'
+    if (kind === 'mines') lastRound.value = {
+      variant: variant.value, elapsedMs: elapsed.value,
+      outcome: game.value.status === 'running' ? 'ended' : game.value.status,
+    }
     if (gameId && !pending.value) {
       pending.value = { id: gameId, actions: [...actions] }
       gameId = null
@@ -98,7 +108,7 @@ export function useArcadeRound(kind, variant, onSaved) {
 
   function discard() { if (!saving.value) { pending.value = null; error.value = ''; message.value = '' } }
   watch(variant, reset)
-  watch(() => auth.user?.id, reset)
+  watch(() => auth.user?.id, () => { lastRound.value = null; reset() })
   watch(() => auth.dialog, (open) => { if (open) pause() })
   function hidden() { if (document.hidden) pause() }
   function cleanup() {
@@ -117,5 +127,5 @@ export function useArcadeRound(kind, variant, onSaved) {
   })
   onDeactivated(cleanup)
   onUnmounted(() => { cleanup(); version++ })
-  return { game, phase, elapsed, starting, saving, error, message, pending, locked, start, restart, pause, finish, act, save, discard }
+  return { game, phase, elapsed, lastRound, starting, saving, error, message, pending, locked, start, restart, pause, finish, act, save, discard }
 }

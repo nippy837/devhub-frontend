@@ -6,6 +6,7 @@ export async function gameRequest(path, { method = 'GET', body } = {}) {
       method,
       signal: controller.signal,
       credentials: 'same-origin',
+      cache: 'no-store',
       headers: method === 'GET' ? {} : { 'Content-Type': 'application/json', 'X-DevHub-Request': '1' },
       body: body === undefined ? undefined : JSON.stringify(body),
     })
