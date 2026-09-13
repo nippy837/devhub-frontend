@@ -1,8 +1,9 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onDeactivated, onMounted, onUnmounted, ref } from 'vue'
 import { getAccounts } from '../api/accounts'
 import AppIcon from './AppIcon.vue'
-import AccountCreateDialog from './AccountCreateDialog.vue'
+import AccountFormDialog from './AccountFormDialog.vue'
+import AccountDeleteDialog from './AccountDeleteDialog.vue'
 import { copyText } from '../utils/clipboard.js'
 
 const accounts = ref([])
@@ -12,7 +13,9 @@ const loading = ref(true)
 const error = ref('')
 const lastUpdated = ref('')
 const toast = ref('')
-const showCreateDialog = ref(false)
+const showFormDialog = ref(false)
+const editingAccount = ref(null)
+const deletingAccount = ref(null)
 const environmentLabels = {
   dev: '开发环境',
   test: '测试环境',
@@ -35,6 +38,7 @@ const testCount = computed(
   () =>
     accounts.value.filter((account) => account.environment === 'test').length,
 )
+// 当前搜索与环境筛选基于已加载列表，不额外请求后端，也没有服务端分页。
 const filteredAccounts = computed(() => {
   const keyword = search.value.trim().toLowerCase()
   return accounts.value.filter((account) => {
@@ -62,7 +66,10 @@ async function loadAccounts() {
   const timeout = setTimeout(() => controller.abort(), 10000)
 
   try {
-    accounts.value = await getAccounts(controller.signal)
+    const data = await getAccounts(controller.signal)
+    // 连续刷新时，旧请求即使稍后返回，也不能覆盖最新一次请求的结果。
+    if (requestController !== controller) return
+    accounts.value = data
     if (
       environment.value !== 'all' &&
       !environments.value.includes(environment.value)
@@ -92,14 +99,31 @@ function resetFilters() {
   environment.value = 'all'
 }
 
-async function handleCreated() {
-  showCreateDialog.value = false
-  resetFilters()
-  toast.value = '账号已保存'
+function openForm(account = null) {
+  editingAccount.value = account
+  showFormDialog.value = true
+}
+
+function showToast(message) {
+  toast.value = message
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => {
     toast.value = ''
   }, 2500)
+}
+
+async function handleSaved(editing) {
+  showFormDialog.value = false
+  editingAccount.value = null
+  // 新增后清空筛选，便于找到新账号；编辑后保留用户正在查看的筛选条件。
+  if (!editing) resetFilters()
+  showToast(editing ? '账号已更新' : '账号已保存')
+  await loadAccounts()
+}
+
+async function handleDeleted() {
+  deletingAccount.value = null
+  showToast('账号已删除')
   await loadAccounts()
 }
 
@@ -139,6 +163,12 @@ function formatTime(value) {
 }
 
 onMounted(loadAccounts)
+// 页面由 KeepAlive 缓存，切换菜单不一定卸载，因此需要主动关闭传送到 body 的弹窗。
+onDeactivated(() => {
+  showFormDialog.value = false
+  editingAccount.value = null
+  deletingAccount.value = null
+})
 onUnmounted(() => {
   requestController?.abort()
   requestController = null
@@ -163,7 +193,7 @@ onUnmounted(() => {
             loading ? '正在加载' : '刷新列表'
           }}
         </button>
-        <button class="button button-primary" @click="showCreateDialog = true">
+        <button class="button button-primary" @click="openForm()">
           新增账号
         </button>
       </div>
@@ -297,6 +327,7 @@ onUnmounted(() => {
               <th scope="col">登录地址</th>
               <th scope="col">备注</th>
               <th scope="col">更新时间</th>
+              <th scope="col" class="account-actions-cell">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -386,6 +417,22 @@ onUnmounted(() => {
               >
                 {{ formatTime(account.updateTime) }}
               </td>
+              <td class="account-actions-cell">
+                <div class="account-row-actions">
+                  <button
+                    type="button"
+                    class="button button-outline"
+                    :aria-label="`编辑账号 ${account.systemName} ${account.username}`"
+                    @click="openForm(account)"
+                  >编辑</button>
+                  <button
+                    type="button"
+                    class="button button-outline account-delete-button"
+                    :aria-label="`删除账号 ${account.systemName} ${account.username}`"
+                    @click="deletingAccount = account"
+                  >删除</button>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -407,10 +454,17 @@ onUnmounted(() => {
       <span>个人开发工作空间</span>
     </footer>
   </main>
-  <AccountCreateDialog
-    v-if="showCreateDialog"
-    @close="showCreateDialog = false"
-    @created="handleCreated"
+  <AccountFormDialog
+    v-if="showFormDialog"
+    :account="editingAccount"
+    @close="showFormDialog = false; editingAccount = null"
+    @saved="handleSaved"
+  />
+  <AccountDeleteDialog
+    v-if="deletingAccount"
+    :account="deletingAccount"
+    @close="deletingAccount = null"
+    @deleted="handleDeleted"
   />
   <div class="toast" role="status" aria-live="polite">
     <template v-if="toast"
@@ -418,3 +472,36 @@ onUnmounted(() => {
     >
   </div>
 </template>
+
+<style scoped>
+/* 表格较宽时固定操作列，用户不必横向滚动到最右侧才能编辑或删除。 */
+.account-actions-cell {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  background: #fff;
+  box-shadow: -5px 0 8px -6px #273b3455;
+}
+th.account-actions-cell {
+  background: #f8faf8;
+}
+tr:hover td.account-actions-cell {
+  background: #fcfdfb;
+}
+.account-row-actions {
+  display: flex;
+  gap: 8px;
+  white-space: nowrap;
+}
+.account-row-actions .button {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.account-delete-button {
+  color: #a03e37;
+  border-color: #ebd2cf;
+}
+.account-delete-button:hover:not(:disabled) {
+  background: #fff2ef;
+}
+</style>

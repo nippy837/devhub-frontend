@@ -1,19 +1,23 @@
 <script setup>
 import { onMounted, onUnmounted, reactive, ref } from 'vue'
-import { createAccount } from '../api/accounts'
+import { createAccount, updateAccount } from '../api/accounts'
 import AppIcon from './AppIcon.vue'
 
-const emit = defineEmits(['close', 'created'])
+const props = defineProps({ account: { type: Object, default: null } })
+const emit = defineEmits(['close', 'saved'])
+// 父组件每次打开弹窗都会重新挂载：传入账号时编辑，未传入时新增。
+const editing = props.account !== null
 const dialog = ref(null)
 const saving = ref(false)
 const error = ref('')
+// 单独复制可编辑字段，避免 v-model 直接改动列表中的账号；取消时丢弃副本即可。
 const form = reactive({
-  systemName: '',
-  environment: 'test',
-  username: '',
-  password: '',
-  loginUrl: '',
-  remark: '',
+  systemName: props.account?.systemName ?? '',
+  environment: props.account?.environment ?? 'test',
+  username: props.account?.username ?? '',
+  password: props.account?.password ?? '',
+  loginUrl: props.account?.loginUrl ?? '',
+  remark: props.account?.remark ?? '',
 })
 let controller
 
@@ -22,6 +26,7 @@ function close() {
 }
 
 async function submit() {
+  // 按钮禁用配合函数入口检查，避免连续点击或回车发出重复写请求。
   if (saving.value) return
   error.value = ''
   if (!form.systemName.trim() || !form.username.trim()) {
@@ -47,17 +52,19 @@ async function submit() {
   controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 20000)
   try {
-    await createAccount(
-      {
-        ...form,
-        systemName: form.systemName.trim(),
-        username: form.username.trim(),
-        loginUrl: form.loginUrl.trim(),
-      },
-      controller.signal,
-    )
-    emit('created')
+    // 只清理名称、用户名和地址两端的空白；密码中的空格必须原样保留。
+    const payload = {
+      ...form,
+      systemName: form.systemName.trim(),
+      username: form.username.trim(),
+      loginUrl: form.loginUrl.trim(),
+    }
+    if (editing) await updateAccount(props.account.id, payload, controller.signal)
+    else await createAccount(payload, controller.signal)
+    // 只有接口明确成功才通知父组件关闭弹窗、重新查询列表。
+    emit('saved', editing)
   } catch (cause) {
+    // 请求中断不等于数据库未写入，因此提示核实结果，不自动重试。
     error.value =
       cause.name === 'AbortError' || cause instanceof TypeError
         ? '连接中断或超时，请刷新列表确认是否已保存后再重试。'
@@ -69,6 +76,7 @@ async function submit() {
 }
 
 onMounted(() => dialog.value.showModal())
+// 关闭弹窗后停止等待请求；abort 不代表能撤销服务器已经完成的写入。
 onUnmounted(() => controller?.abort())
 </script>
 
@@ -86,11 +94,11 @@ onUnmounted(() => controller?.abort())
       "
     >
       <header class="dialog-heading">
-        <h2 id="create-title">新增账号</h2>
+        <h2 id="create-title">{{ editing ? '编辑账号' : '新增账号' }}</h2>
         <button
           type="button"
           class="icon-button"
-          aria-label="关闭新增账号"
+          :aria-label="editing ? '关闭编辑账号' : '关闭新增账号'"
           :disabled="saving"
           @click="close"
         >
@@ -182,7 +190,7 @@ onUnmounted(() => controller?.abort())
             class="button button-primary"
             :disabled="saving"
           >
-            {{ saving ? '保存中…' : '保存账号' }}
+            {{ saving ? '保存中…' : editing ? '保存修改' : '保存账号' }}
           </button>
         </footer>
       </form>

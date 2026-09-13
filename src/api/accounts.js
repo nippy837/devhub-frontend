@@ -1,4 +1,5 @@
-// 后端返回 Result<List<AccountVO>>，业务数据位于 data 字段。
+// 统一解析后端的 Result<T>：HTTP 状态和业务 code 都成功，才把 data 交给页面。
+// 列表的 data 是账号数组；新增是 ID；修改、删除允许为 null。
 async function readResult(response) {
   let result
   try {
@@ -33,6 +34,26 @@ export async function createAccount(account, signal) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(account),
+    signal,
+  })
+  return readResult(response)
+}
+
+// PUT 提交完整表单，账号 ID 放在路径中；空密码表示清空，不能当作“保留原密码”。
+export async function updateAccount(id, account, signal) {
+  const response = await fetch(`/api/accounts/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(account),
+    signal,
+  })
+  return readResult(response)
+}
+
+export async function deleteAccount(id, signal) {
+  // 删除接口仍返回 Result<Void> JSON（HTTP 200），不是 204 空响应。
+  const response = await fetch(`/api/accounts/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
     signal,
   })
   return readResult(response)
