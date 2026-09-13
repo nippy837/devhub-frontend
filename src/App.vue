@@ -6,6 +6,7 @@ import DiffTool from './components/DiffTool.vue'
 import SpeedTool from './components/SpeedTool.vue'
 import AppIcon from './components/AppIcon.vue'
 import SnakeGame from './components/SnakeGame.vue'
+import ArcadeGame from './components/ArcadeGame.vue'
 import AuthDialog from './components/AuthDialog.vue'
 import { auth, loadAuth, logout, openAuth } from './composables/useAuth.js'
 
@@ -30,6 +31,9 @@ const pages = [
   { id: 'tools/diff', title: '文本对比', icon: 'compare', component: DiffTool },
   { id: 'tools/speed', title: '网速测试', icon: 'speed', component: SpeedTool },
   { id: 'games/snake', title: '贪吃蛇', icon: 'snake', component: SnakeGame, group: 'games' },
+  { id: 'games/2048', title: '2048', icon: 'grid', component: ArcadeGame, props: { kind: '2048' }, group: 'games' },
+  { id: 'games/sokoban', title: '推箱子', icon: 'box', component: ArcadeGame, props: { kind: 'sokoban' }, group: 'games' },
+  { id: 'games/mines', title: '扫雷', icon: 'mine', component: ArcadeGame, props: { kind: 'mines' }, group: 'games' },
 ]
 const mainPages = pages.filter((page) => page.group !== 'games')
 const games = pages.filter((page) => page.group === 'games')
@@ -134,7 +138,7 @@ watch(
           </template>
         </div>
       </header>
-      <KeepAlive><component :is="current.component" /></KeepAlive>
+      <KeepAlive><component :is="current.component" :key="current.id" v-bind="current.props || {}" /></KeepAlive>
     </div>
     <AuthDialog />
   </div>

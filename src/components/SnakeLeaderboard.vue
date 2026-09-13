@@ -1,14 +1,25 @@
 <script setup>
 import { onMounted, ref, watch } from 'vue'
-import { getLeaderboard } from '../api/game.js'
+import { getLeaderboard, getArcadeLeaderboard } from '../api/game.js'
 import { auth, openAuth } from '../composables/useAuth.js'
 import AppIcon from './AppIcon.vue'
+
+const props = defineProps({
+  kind: { type: String, default: 'snake' },
+  variant: { type: String, default: 'classic' },
+  title: { type: String, default: '贪吃蛇' },
+})
+const metricLabel = () => props.kind === 'sokoban' ? '我的最少步数' : props.kind === 'mines' ? '我的最快用时' : '我的最高分'
+function formatScore(value) {
+  if (value == null) return '—'
+  return props.kind === 'mines' ? `${(value / 1000).toFixed(2)} 秒` : props.kind === 'sokoban' ? `${value} 步` : value
+}
 
 const emit = defineEmits(['best'])
 const entries = ref([])
 const loading = ref(false)
 const error = ref('')
-const myBest = ref(0)
+const myBest = ref(props.kind === 'snake' ? 0 : null)
 let version = 0
 
 async function refresh() {
@@ -16,7 +27,7 @@ async function refresh() {
   loading.value = true
   error.value = ''
   try {
-    const result = await getLeaderboard()
+    const result = await (props.kind === 'snake' ? getLeaderboard() : getArcadeLeaderboard(props.kind, props.variant))
     if (requestVersion !== version) return
     entries.value = result.entries
     myBest.value = result.myBest
@@ -26,29 +37,29 @@ async function refresh() {
   } finally { if (requestVersion === version) loading.value = false }
 }
 onMounted(refresh)
-watch(() => auth.user?.id, () => { entries.value = []; myBest.value = 0; refresh() })
+watch(() => [auth.user?.id, props.kind, props.variant], () => { entries.value = []; myBest.value = null; refresh() })
 defineExpose({ refresh })
 </script>
 
 <template>
-  <section class="leaderboard" aria-label="贪吃蛇排行榜">
+  <section class="leaderboard" :aria-label="`${title}排行榜`">
     <div class="leaderboard-heading">
       <h2>排行榜 <span>TOP 50</span></h2>
       <button type="button" class="icon-button" aria-label="刷新排行榜" :disabled="loading" @click="refresh"><AppIcon name="refresh" :size="17" /></button>
     </div>
-    <p v-if="auth.user" class="my-best">我的最高分 <strong>{{ myBest }}</strong></p>
+    <p v-if="auth.user" class="my-best">{{ metricLabel() }} <strong>{{ formatScore(myBest) }}</strong></p>
     <p v-else class="leaderboard-login"><button type="button" @click="openAuth()">登录参与排行</button></p>
     <p v-if="error" class="ranking-error" role="alert">{{ error }} <button type="button" @click="refresh">重试</button></p>
     <p v-else-if="loading && !entries.length" class="ranking-empty" role="status">正在加载…</p>
     <p v-else-if="!entries.length" class="ranking-empty">还没有成绩，来拿下第一名吧。</p>
-    <ol v-else class="ranking-list" aria-label="最高分排名">
+    <ol v-else class="ranking-list" aria-label="游戏成绩排名">
       <li v-for="entry in entries" :key="entry.userId" :class="{ mine: entry.userId === auth.user?.id }">
         <span class="rank" :class="{ podium: entry.rank <= 3 }">{{ entry.rank }}</span>
         <span class="rank-name">{{ entry.username }}<small v-if="entry.userId === auth.user?.id"> 我</small></span>
-        <strong>{{ entry.score }}</strong>
+        <strong>{{ formatScore(entry.score) }}</strong>
       </li>
     </ol>
-    <p class="ranking-rule">每人显示最高分，同分按注册顺序排列。</p>
+    <p class="ranking-rule">{{ kind === 'sokoban' ? '本关通关步数越少越靠前，每人保留最佳成绩。' : kind === 'mines' ? '本难度通关用时越短越靠前，每人保留最佳成绩。' : '每人显示最高分，同分按注册顺序排列。' }}</p>
   </section>
 </template>
 

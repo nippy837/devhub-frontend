@@ -2,6 +2,8 @@
 defineProps({ name: String, size: { type: Number, default: 20 } })
 
 const paths = {
+  mine: 'M18 12a6 6 0 1 1-12 0 6 6 0 0 1 12 0 M12 2v3 M12 19v3 M2 12h3 M19 12h3 M5 5l2 2 M17 17l2 2 M5 19l2-2 M17 7l2-2 M10 10h.01',
+  player: 'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0 M5 21v-2a7 7 0 0 1 14 0v2',
   game: 'M7 7h10a4 4 0 0 1 4 3l1 7a2 2 0 0 1-3 2l-4-3H9l-4 3a2 2 0 0 1-3-2l1-7a4 4 0 0 1 4-3 M7 10v4 M5 12h4 M16 11h.01 M19 13h.01',
   snake: 'M5 5h10a4 4 0 0 1 0 8H9a4 4 0 0 0 0 8h10 M5 5V3 M8 5V3 M19 21v-2',
   speed:

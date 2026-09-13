@@ -1010,7 +1010,7 @@ tbody tr:hover {
   }
   .nav-game-group { margin-top: 4px; flex-basis: 100%; }
   .nav-group-toggle { justify-content: flex-start; }
-  .nav-children { display: flex; margin-left: 12px; }
+  .nav-children { display: flex; flex-wrap: wrap; gap: 4px; margin-left: 12px; }
   .nav-children .nav-item { flex: 0 1 auto; }
   .nav-item {
     flex: 1 0 auto;
