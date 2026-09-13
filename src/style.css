@@ -856,6 +856,22 @@ tbody tr:hover {
 .tools-heading {
   margin-top: 28px;
 }
+.nav-game-group {
+  margin-top: 28px;
+}
+.nav-group-toggle {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+.nav-group-toggle.group-active { color: var(--green); }
+.nav-group-chevron { margin-left: auto; transition: transform .15s; }
+.nav-group-chevron.expanded { transform: rotate(90deg); }
+.nav-children { margin: 6px 0 0 14px; padding-left: 8px; border-left: 1px solid var(--border); }
+.nav-children .nav-item { padding: 11px 12px; }
+.sidebar { overflow-y: auto; }
 .nav-item + .nav-item {
   margin-top: 5px;
 }
@@ -992,6 +1008,10 @@ tbody tr:hover {
     margin: 0;
     gap: 4px;
   }
+  .nav-game-group { margin-top: 4px; flex-basis: 100%; }
+  .nav-group-toggle { justify-content: flex-start; }
+  .nav-children { display: flex; margin-left: 12px; }
+  .nav-children .nav-item { flex: 0 1 auto; }
   .nav-item {
     flex: 1 0 auto;
     justify-content: center;

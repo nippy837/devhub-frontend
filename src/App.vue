@@ -5,6 +5,7 @@ import JsonTool from './components/JsonTool.vue'
 import DiffTool from './components/DiffTool.vue'
 import SpeedTool from './components/SpeedTool.vue'
 import AppIcon from './components/AppIcon.vue'
+import SnakeGame from './components/SnakeGame.vue'
 
 const pages = [
   {
@@ -16,7 +17,11 @@ const pages = [
   { id: 'tools/json', title: 'JSON 格式化', icon: 'code', component: JsonTool },
   { id: 'tools/diff', title: '文本对比', icon: 'compare', component: DiffTool },
   { id: 'tools/speed', title: '网速测试', icon: 'speed', component: SpeedTool },
+  { id: 'games/snake', title: '贪吃蛇', icon: 'snake', component: SnakeGame, group: 'games' },
 ]
+const mainPages = pages.filter((page) => page.group !== 'games')
+const games = pages.filter((page) => page.group === 'games')
+const gamesExpanded = ref(false)
 const hash = ref(location.hash)
 const current = computed(
   () =>
@@ -32,6 +37,7 @@ watch(
   current,
   (page) => {
     document.title = `${page.title} · DevHub`
+    if (page.group === 'games') gamesExpanded.value = true
   },
   { immediate: true },
 )
@@ -45,7 +51,7 @@ watch(
         <span>DevHub<span class="brand-dot">.</span></span>
       </a>
       <nav aria-label="主导航">
-        <template v-for="(page, index) in pages" :key="page.id">
+        <template v-for="(page, index) in mainPages" :key="page.id">
           <p
             v-if="index < 2"
             class="nav-heading"
@@ -65,6 +71,32 @@ watch(
             <span v-if="current.id === page.id" class="nav-dot"></span>
           </a>
         </template>
+        <div class="nav-game-group">
+          <button
+            class="nav-item nav-group-toggle"
+            :class="{ 'group-active': current.group === 'games' }"
+            type="button"
+            :aria-expanded="gamesExpanded"
+            aria-controls="game-navigation"
+            @click="gamesExpanded = !gamesExpanded"
+          >
+            <AppIcon name="game" :size="19" /><span>小游戏</span>
+            <AppIcon class="nav-group-chevron" :class="{ expanded: gamesExpanded }" name="chevron" :size="15" />
+          </button>
+          <div v-show="gamesExpanded" id="game-navigation" class="nav-children">
+            <a
+              v-for="game in games"
+              :key="game.id"
+              class="nav-item"
+              :class="{ active: current.id === game.id }"
+              :href="`#/${game.id}`"
+              :aria-current="current.id === game.id ? 'page' : undefined"
+            >
+              <AppIcon :name="game.icon" :size="18" /><span>{{ game.title }}</span>
+              <span v-if="current.id === game.id" class="nav-dot"></span>
+            </a>
+          </div>
+        </div>
       </nav>
       <div class="sidebar-bottom">
         <div class="workspace-avatar">我</div>
