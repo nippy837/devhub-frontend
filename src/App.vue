@@ -4,6 +4,7 @@ import AccountList from './components/AccountList.vue'
 import JsonTool from './components/JsonTool.vue'
 import DiffTool from './components/DiffTool.vue'
 import SpeedTool from './components/SpeedTool.vue'
+import AiChat from './components/AiChat.vue'
 import AppIcon from './components/AppIcon.vue'
 import SnakeGame from './components/SnakeGame.vue'
 import ArcadeGame from './components/ArcadeGame.vue'
@@ -30,6 +31,7 @@ const pages = [
   { id: 'tools/json', title: 'JSON 格式化', icon: 'code', component: JsonTool },
   { id: 'tools/diff', title: '文本对比', icon: 'compare', component: DiffTool },
   { id: 'tools/speed', title: '网速测试', icon: 'speed', component: SpeedTool },
+  { id: 'tools/ai', title: 'AI 对话', icon: 'sparkles', component: AiChat },
   { id: 'games/snake', title: '贪吃蛇', icon: 'snake', component: SnakeGame, group: 'games' },
   { id: 'games/2048', title: '2048', icon: 'grid', component: ArcadeGame, props: { kind: '2048' }, group: 'games' },
   { id: 'games/sokoban', title: '推箱子', icon: 'box', component: ArcadeGame, props: { kind: 'sokoban' }, group: 'games' },
